@@ -1,0 +1,7 @@
+Debug
+Debug/*
+Release
+Release/*
+.settings
+.settings/*
+*.o
