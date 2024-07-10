@@ -76,8 +76,6 @@ void print_status() {
 }
 /* USER CODE END 0 */
 
-
-
 /**
   * @brief  The application entry point.
   * @retval int
@@ -115,10 +113,11 @@ int main(void)
   HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
 
   char buffer[20];
+  uint8_t buf8[20];
 
   HAL_Delay(3000);
 
-
+/*
   while(!LTC2986_is_ready(&therms)) {
 	print_status();
   }
@@ -139,8 +138,24 @@ int main(void)
     print_status();
 
   HAL_Delay(1500);
-  HAL_UART_Transmit(&huart2, (uint8_t *) "Holaaa\n\r", strlen("Holaaa\n\r"), 100);
-
+    HAL_UART_Transmit(&huart2, (uint8_t *) "Holaaa\n\r", strlen("Holaaa\n\r"), 100);
+    */
+	uint8_t message = 0x02;
+	uint8_t address[2];
+	address[0] = 0x02;
+	address[1] = 0x04;
+	uint8_t datu[7];
+	datu[0]= 0x02;
+	datu[1]= 0x02;
+	datu[2]= 0x04;
+	datu[3]= 0x39;
+	datu[4]= 0xE0;
+	datu[5]= 0x00;
+	datu[6]= 0x00;
+	uint8_t read_instruction = 0x03;
+		  	uint8_t address_8bit[2];
+		  	address_8bit[0] = 0x00;
+		  	address_8bit[1] = 0x00;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -150,9 +165,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	HAL_Delay(2000);
-
-    print_status();
+/*
+	print_status();
     temperature = LTC2986_measure_channel(&therms, 2);
     if(isnan(temperature)) {
     	HAL_UART_Transmit(&huart2, (uint8_t *) "temp reading fault", strlen("temp reading fault"), 100);
@@ -161,6 +175,18 @@ int main(void)
     HAL_UART_Transmit(&huart2, (uint8_t *) "temp = ", strlen("temp = "), 100);
 	sprintf(buffer, "%d\n\r", (int) temperature);
 	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+*/
+
+
+	  	HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_RESET);
+	  	HAL_SPI_Transmit(therms.spi_handle, &read_instruction, 1, 50U); // Read instruction
+	  	HAL_SPI_Transmit(therms.spi_handle, address_8bit, 2, 50U); // Address
+	  	HAL_SPI_Receive(therms.spi_handle, buf8, 1, 50U);
+	  	HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
+
+	  	HAL_UART_Transmit(&huart2, (uint8_t *) "status = ", strlen("status = "), 100);
+	  	sprintf(buffer, "%02X\n\r", (int) *buf8);
+	  	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
 
   }
   /* USER CODE END 3 */
@@ -186,7 +212,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 84;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -196,12 +227,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -227,8 +258,8 @@ static void MX_SPI2_Init(void)
   hspi2.Init.Mode = SPI_MODE_MASTER;
   hspi2.Init.Direction = SPI_DIRECTION_2LINES;
   hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
-  hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
   hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
@@ -290,6 +321,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
