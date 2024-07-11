@@ -36,6 +36,9 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define THERMOCOUPLE_CHANNEL (uint8_t) 0x02
+#define RTD_CHANNEL (uint8_t) 0x07
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -117,45 +120,47 @@ int main(void)
 
   HAL_Delay(3000);
 
-/*
   while(!LTC2986_is_ready(&therms)) {
 	print_status();
   }
-  uint8_t buffer1 = 0;
-  LTC2986_global_configure(&therms, &buffer1);
-  // We print the global register:
-    HAL_UART_Transmit(&huart2, (uint8_t *) "global register = ", strlen("global register = "), 200);
-    HAL_Delay(500);
-    sprintf(buffer, "%d\n\r", (int) buffer1);
-    HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
-
-    print_status();
-  LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, 7, 5);
-    print_status();
-  LTC2986_configure_sense_resistor(&therms, 5, 100);
-    print_status();
-  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, 2, 7);
-    print_status();
+  /*
+    // We print the global register:
+      HAL_UART_Transmit(&huart2, (uint8_t *) "global register = ", strlen("global register = "), 200);
+      HAL_Delay(500);
+      sprintf(buffer, "%d\n\r", (int) buffer1);
+      HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
 
   HAL_Delay(1500);
     HAL_UART_Transmit(&huart2, (uint8_t *) "Holaaa\n\r", strlen("Holaaa\n\r"), 100);
-    */
-	uint8_t message = 0x02;
-	uint8_t address[2];
-	address[0] = 0x02;
-	address[1] = 0x04;
-	uint8_t datu[7];
-	datu[0]= 0x02;
-	datu[1]= 0x02;
-	datu[2]= 0x04;
-	datu[3]= 0x39;
-	datu[4]= 0xE0;
-	datu[5]= 0x00;
-	datu[6]= 0x00;
-	uint8_t read_instruction = 0x03;
-		  	uint8_t address_8bit[2];
-		  	address_8bit[0] = 0x00;
-		  	address_8bit[1] = 0x00;
+*/
+
+  uint8_t read_instruction = 0x03;
+  uint8_t address_8bit[2];
+  address_8bit[0] = 0x00;
+  address_8bit[1] = 0x00;
+
+  while(!LTC2986_is_ready(&therms)) {
+ 	     print_status();
+ 	  }
+
+ 	  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, THERMOCOUPLE_CHANNEL, RTD_CHANNEL);
+ 	  while(!LTC2986_is_ready(&therms)) {
+ 		print_status();
+ 	  }
+ 	  LTC2986_configure_sense_resistor(&therms, 5, 100);
+ 	  while(!LTC2986_is_ready(&therms)) {
+ 		print_status();
+ 	  }
+ 	  LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, RTD_CHANNEL, 5);
+  	  while(!LTC2986_is_ready(&therms)) {
+  		print_status();
+  	  }
+
+ 	  uint8_t buffer1 = 0;
+ 	  LTC2986_global_configure(&therms, &buffer1);
+ 	  HAL_Delay(100);
+ 	 HAL_UART_Transmit(&huart2, (uint8_t *) "Hola mundo!", strlen("Hola mundo!"), 100);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -165,29 +170,31 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-/*
-	print_status();
-    temperature = LTC2986_measure_channel(&therms, 2);
+
+	while(!LTC2986_is_ready(&therms)) {
+	  print_status();
+	}
+    temperature = LTC2986_measure_channel(&therms, THERMOCOUPLE_CHANNEL);
     if(isnan(temperature)) {
     	HAL_UART_Transmit(&huart2, (uint8_t *) "temp reading fault", strlen("temp reading fault"), 100);
     }
+
     // We print the temperature
-    HAL_UART_Transmit(&huart2, (uint8_t *) "temp = ", strlen("temp = "), 100);
-	sprintf(buffer, "%d\n\r", (int) temperature);
+    HAL_UART_Transmit(&huart2, (uint8_t *) "thermocouple = ", strlen("thermocouple = "), 100);
+	sprintf(buffer, "%0.2f\n\r", temperature);
 	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
-*/
+    print_status();
 
+    temperature = LTC2986_measure_channel(&therms, RTD_CHANNEL);
+        if(isnan(temperature)) {
+        	HAL_UART_Transmit(&huart2, (uint8_t *) "temp reading fault", strlen("temp reading fault"), 100);
+        }
 
-	  	HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_RESET);
-	  	HAL_SPI_Transmit(therms.spi_handle, &read_instruction, 1, 50U); // Read instruction
-	  	HAL_SPI_Transmit(therms.spi_handle, address_8bit, 2, 50U); // Address
-	  	HAL_SPI_Receive(therms.spi_handle, buf8, 1, 50U);
-	  	HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
-
-	  	HAL_UART_Transmit(&huart2, (uint8_t *) "status = ", strlen("status = "), 100);
-	  	sprintf(buffer, "%02X\n\r", (int) *buf8);
-	  	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
-
+        // We print the temperature
+        HAL_UART_Transmit(&huart2, (uint8_t *) "RTD sensor = ", strlen("RTD sensor = "), 100);
+    	sprintf(buffer, "%0.2f\n\r", temperature);
+    	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+        print_status();
   }
   /* USER CODE END 3 */
 }

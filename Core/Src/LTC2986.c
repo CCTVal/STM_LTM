@@ -24,24 +24,24 @@
 #define LTC2986_CH_ADDRESS_BASE                  (uint16_t) 0x0200
 #define LTC2986_VOUT_CH_BASE                     (uint16_t) 0x0060
 #define LTC2986_READ_CH_BASE                     (uint16_t) 0x0010
-#define LTC2986_CONVERSION_RESULT_REGISTER    (uint16_t) 0x0010
+#define LTC2986_CONVERSION_RESULT_REGISTER       (uint16_t) 0x0010
 #define LTC2986_GLOBAL_CONFIGURATION_REGISTER    (uint16_t) 0x00F0
 #define LTC2986_DELAY_REGISTER                   (uint16_t) 0x00FF
 
 void int32_to_int8_array(int32_t int32_value, uint8_t *int8_array) {
     // Using pointer arithmetic to access each byte of the 32-bit integer
-    *int8_array = (uint8_t)(int32_value & 0xFF);        // Least significant byte (LSB)
-    *(int8_array + 1) = (uint8_t)((int32_value >> 8) & 0xFF);
-    *(int8_array + 2) = (uint8_t)((int32_value >> 16) & 0xFF);
-    *(int8_array + 3) = (uint8_t)((int32_value >> 24) & 0xFF);  // Most significant byte (MSB)
+    *(int8_array + 3) = (uint8_t)(int32_value & 0xFF);        // Most significant byte (LSB)
+    *(int8_array + 2) = (uint8_t)((int32_value >> 8) & 0xFF);
+    *(int8_array + 1) = (uint8_t)((int32_value >> 16) & 0xFF);
+    *(int8_array + 0) = (uint8_t)((int32_value >> 24) & 0xFF);  // Least significant byte (MSB)
     return;
 }
 
 void read_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer) {
 	uint8_t read_instruction = READ_FROM_RAM;
 	uint8_t address_8bit[2];
-	address_8bit[0] = (uint8_t) (address) & 0xFF;
-	address_8bit[1] = (uint8_t) (address >> 8) & 0xFF;
+	address_8bit[1] = (uint8_t) (address) & 0xFF;
+	address_8bit[0] = (uint8_t) (address >> 8) & 0xFF;
 	HAL_GPIO_WritePin(LTM->cs_pin.gpio_port, LTM->cs_pin.gpio_pin, GPIO_PIN_RESET);
 	HAL_SPI_Transmit(LTM->spi_handle, &read_instruction, 1, LTC2986_SPI_TIMEOUT); // Read instruction
 	HAL_SPI_Transmit(LTM->spi_handle, address_8bit, 2, LTC2986_SPI_TIMEOUT); // Address
@@ -53,8 +53,8 @@ void read_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer) {
 void write_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer) {
 	uint8_t write_instruction = WRITE_TO_RAM;
 	uint8_t address_8bit[2];
-	address_8bit[0] = (uint8_t) (address) & 0xFF;
-	address_8bit[1] = (uint8_t) (address >> 8) & 0xFF;
+	address_8bit[1] = (uint8_t) (address) & 0xFF;
+	address_8bit[0] = (uint8_t) (address >> 8) & 0xFF;
 	HAL_GPIO_WritePin(LTM->cs_pin.gpio_port, LTM->cs_pin.gpio_pin, GPIO_PIN_RESET);
 	HAL_SPI_Transmit(LTM->spi_handle, &write_instruction, 1, LTC2986_SPI_TIMEOUT); // Read instruction
 	HAL_SPI_Transmit(LTM->spi_handle, address_8bit, 2, LTC2986_SPI_TIMEOUT); // Address
@@ -64,9 +64,9 @@ void write_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer) {
 }
 
 void LTC2986_global_configure(LTC2986_t *LTM, uint8_t* buffer) {
-	uint8_t config = 0x10;
+	uint8_t config = 0x00;
 	write_RAM(LTM, LTC2986_GLOBAL_CONFIGURATION_REGISTER, 1, &config); // Filter 55 Hz, Celsius, no excitation mode
-	HAL_Delay(500);
+	write_RAM(LTM, LTC2986_DELAY_REGISTER, 1, &config); // Filter 55 Hz, Celsius, no excitation mode
 	read_RAM(LTM, LTC2986_GLOBAL_CONFIGURATION_REGISTER, 1, buffer); // Filter 55 Hz, Celsius, no excitation mode
 	return;
 }
@@ -100,12 +100,12 @@ void LTC2986_configure_thermocouple(LTC2986_t *LTM, LTC2986_sensor_t type, uint8
 }
 
 void LTC2986_configure_sense_resistor(LTC2986_t *LTM, uint8_t channel_number, float resistance) {
-	uint32_t configuration = 0;
+	uint32_t configuration = 29 << 27;
 	if(resistance > 131.07) {
 		// This is a programming error.
 		resistance = 131;
 	}
-	configuration = (uint32_t) ((int) resistance* 1024);
+	configuration |= (uint32_t) ((int) resistance* 1024);
 	uint8_t temp[4];
 	int32_to_int8_array(configuration, temp);
 	write_RAM(LTM, LTC2986_CH_ADDRESS_BASE + (4 * (channel_number - 1)), 4, temp);
@@ -127,12 +127,14 @@ uint8_t LTC2986_read_status(LTC2986_t *LTM) {
 }
 
 float LTC2986_measure_channel(LTC2986_t *LTM, uint8_t channel_number) {
-	channel_number |= START_CONVERTION;
-	write_RAM(LTM, LTC2986_COMMAND_REGISTER, 1, &channel_number); // We command to initiate the conversion
+	uint8_t convert_instruction = channel_number | START_CONVERTION;
+	HAL_Delay(300);
+	write_RAM(LTM, LTC2986_COMMAND_REGISTER, 1, &convert_instruction); // We command to initiate the conversion
 	HAL_Delay(200);
 	while(!LTC2986_is_ready(LTM));
 	uint8_t temp[4];
-	read_RAM(LTM, LTC2986_CONVERSION_RESULT_REGISTER, 4, temp);
+	uint16_t address = LTC2986_CONVERSION_RESULT_REGISTER + (4 * (channel_number - 1));
+	read_RAM(LTM, address, 4, temp);
 	uint8_t fault = temp[0];
 	if(fault != LTC2986_VALID) {
 		return(0xFFFFFF00 & fault); // Return a NaN with the fault encoded
