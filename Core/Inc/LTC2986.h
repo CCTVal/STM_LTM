@@ -27,13 +27,13 @@
 // -- CONFIGURATION CONSTANTS
 //**************************************************************
 #define LTC2986_CELSIUS                  (uint8_t) 0x00
-#define LTC2986_FAHRENHEIT               (uint8_t) 0x01
-#define LTC2986_ 0
-#define LTC2986_ 0
-#define LTC2986_ 0
-#define LTC2986_ 0
-#define LTC2986_ 0
-#define LTC2986_ 0
+#define LTC2986_FAHRENHEIT               (uint8_t) 0x04
+#define LTC2986_FILTER_55_HZ             (uint8_t) 0x00
+#define LTC2986_FILTER_60_HZ             (uint8_t) 0x01
+#define LTC2986_FILTER_50_HZ             (uint8_t) 0x02
+#define LTC2986_3_WIRE_KELVIN            (uint8_t) 0x10
+#define LTC2986_2_WIRE_KELVIN            (uint8_t) 0x20
+#define LTC2986_THERMISTOR_KELVIN        (uint8_t) 0x40
 
 typedef enum {
 	LTC2986_TYPE_J_THERMOCOUPLE = 0x01,
@@ -61,16 +61,8 @@ typedef struct {
     LTC2986_gpio_t cs_pin;
 } LTC2986_t;
 
-/*
-typedef enum {
-	INVALID_CHANNEL_TYPE	= 0x0,
-	VOLTAGE_CHANNEL			= 0x1,
-	TEMPERATURE_CHANNEL		= 0x2,
-	CODE_CHANNEL			= 0x3,
-} LTC2986ChannelType;
-*/
 
-void LTC2986_global_configure(LTC2986_t *LTM, uint8_t* buffer);
+void LTC2986_global_configure(LTC2986_t *LTM);
 void LTC2986_configure_rtd(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channel_number, uint8_t sense_channel);
 void LTC2986_configure_sense_resistor(LTC2986_t *LTM, uint8_t channel_number, float resistance);
 void LTC2986_configure_thermocouple(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channel_number, uint8_t cold_juntion_channel);
