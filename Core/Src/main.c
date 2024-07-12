@@ -39,6 +39,10 @@
 #define THERMOCOUPLE_CHANNEL (uint8_t) 0x02
 #define RTD_CHANNEL (uint8_t) 0x07
 
+#define MAX_COMND_COUNT 3 // Numero maximo de veces consecutivas para el mismo caracter
+#define THERMOCOUPLES   2
+#define CHANNELS        {2, 7}
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,8 +56,14 @@ SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-float temperature;
-float cold_junction_temperature;
+uint8_t cadena[1] = "0";
+char last_char = '\0'; // To record last character received
+int same_char_count = 0; // Counter for the consecutive times that a specific character has been received
+int chars_to_expect = -1; // Counter for the digits that should be sent from the SMART in commands like GGG
+float raw_temperature;
+int temperatures[16] = {3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800};
+uint8_t channels[THERMOCOUPLES] = CHANNELS;
+uint8_t i, j;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -87,8 +97,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  temperature = 0;
-  cold_junction_temperature = 0;
 
   /* USER CODE END 1 */
 
@@ -114,22 +122,18 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
-
-  char buffer[20];
+  HAL_UART_Receive_IT(&huart2, cadena, 1);
 
   HAL_Delay(400);
-
   while(!LTC2986_is_ready(&therms)) {
 	print_status();
   }
 
   // HAL_UART_Transmit(&huart2, (uint8_t *) "Holaaa\n\r", strlen("Holaaa\n\r"), 100);
-
+  // SECTION: CONFIGURE LTM
   LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, THERMOCOUPLE_CHANNEL, RTD_CHANNEL);
   LTC2986_configure_sense_resistor(&therms, 5, 100);
   LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, RTD_CHANNEL, 5);
-
-  uint8_t buffer1 = 0;
   LTC2986_global_configure(&therms);
   HAL_Delay(100);
 
@@ -143,29 +147,18 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	while(!LTC2986_is_ready(&therms)) {
-	  print_status();
-	}
-    temperature = LTC2986_measure_channel(&therms, THERMOCOUPLE_CHANNEL);
-    if(isnan(temperature)) {
-    	HAL_UART_Transmit(&huart2, (uint8_t *) "temp reading fault", strlen("temp reading fault"), 100);
+	// SECTION: Read LTM channels and update temperatures[]
+    for(j = 0; j < THERMOCOUPLES; j++) {
+    	i = channels[j];
+    	raw_temperature = LTC2986_measure_channel(&therms, i);
+    	if(isnan(raw_temperature)) {
+    		raw_temperature = 10; // There's been an error
+    	}
+    	if(raw_temperature > 99.99) raw_temperature = 99.99;
+    	else if(raw_temperature < 10.00) raw_temperature = 10.00;
+    	temperatures[j] = (int)(raw_temperature * 100);
+
     }
-
-    // We print the temperature
-    HAL_UART_Transmit(&huart2, (uint8_t *) "tmcouple = ", strlen("tmcouple = "), 100);
-	sprintf(buffer, "%0.2f\n\r", temperature);
-	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
-
-    temperature = LTC2986_measure_channel(&therms, RTD_CHANNEL);
-    if(isnan(temperature)) {
-    	HAL_UART_Transmit(&huart2, (uint8_t *) "temp reading fault", strlen("temp reading fault"), 100);
-    	HAL_Delay(100);
-    }
-
-    // We print the temperature
-    HAL_UART_Transmit(&huart2, (uint8_t *) "RTD sensor = ", strlen("RTD sensor = "), 100);
-    sprintf(buffer, "%0.2f\n\r", temperature);
-    HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
   }
   /* USER CODE END 3 */
 }
@@ -319,7 +312,129 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+uint8_t char_counter(char c) {
+  // Si el carácter recibido es diferente al último carácter almacenado
+  if (c != last_char) {
+    // Reiniciar el contador y actualizar el último carácter almacenado
+    same_char_count = 1;
+    last_char = c;
+  } else {
+    // Si es el mismo carácter, incrementar el contador
+    same_char_count++;
+  }
 
+  // Si se ha recibido el mismo carácter el número máximo de veces consecutivas
+  if (same_char_count >= MAX_COMND_COUNT) {
+    // Responder con un mensaje específico
+    //HAL_UART_Transmit(&huart2, (uint8_t *)"OK\n\r", strlen("OK\n\r"), 100);
+    // Reiniciar el contador y el último carácter almacenado
+    same_char_count = 0;
+    last_char = '\0';
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+void N_name_and_status_handler(){
+  char respuesta_N[6]="111000"; // This is for LT-100. Comment for S-100
+  //char respuesta_N[6]="222000"; // This is for S-100. Comment for LT-100
+  char *s;
+  for ( s=respuesta_N; *s != '\0'; s++ ) {
+    HAL_UART_Transmit(&huart2,(uint8_t *)s , 1, 100);
+  }
+}
+
+void done(){
+  char respuesta_N[3]="DDD";
+  char *s;
+  for ( s=respuesta_N; *s != '\0'; s++ ) {
+    HAL_UART_Transmit(&huart2,(uint8_t *)s , 1, 100);
+  }
+}
+
+void T_temperature_handler(){
+  char temperature_str[70] = "EEE";
+  int i=0;
+  for(i=0;i<16;i++){
+    temperature_str[i*4 + 6]= '\0';
+    sprintf(temperature_str + (3 + 4*i), "%04d", temperatures[i]);  // falta ver que hacer para que funcione cuando el numero tiene menos de 4 digitos.
+  }
+
+  unsigned checksum = 0;
+  for (int i = 3; i < 3 + 4 * 16; i++) {
+    checksum += temperature_str[i];
+  }
+  int onChar = 3+64;
+  temperature_str[onChar++] = checksum % 256;
+  temperature_str[onChar++] = checksum / 256;
+
+  char *s;
+  for ( s=temperature_str; *s != '\0'; s++ ) {
+    HAL_UART_Transmit(&huart2,(uint8_t *)s , 1, 100);
+  }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+
+  /* Prevent unused argument(s) compilation warning */
+  if(huart->Instance == USART2)
+  {
+    if(--chars_to_expect != 0) {
+      switch(cadena[0]){
+        case 'I':
+          if(char_counter(cadena[0])){
+            done();
+          }
+          break;
+        case 'N':
+          if(char_counter(cadena[0])){
+            //HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
+            N_name_and_status_handler();
+          }
+          break;
+        case 'T':
+          if(char_counter(cadena[0])){
+             T_temperature_handler();
+          }
+          break;
+        case 'V':
+          if(char_counter(cadena[0])){
+            chars_to_expect = 3;
+          }
+          break;
+        case 'G':
+          if(char_counter(cadena[0])){
+            chars_to_expect = 3;
+          }
+          break;
+        case 'E':
+          if(char_counter(cadena[0])){
+            chars_to_expect = 18;
+          }
+          break;
+        case 'F':
+          if(char_counter(cadena[0])){
+            chars_to_expect = 3;
+          }
+          break;
+        case 'R':
+          if(char_counter(cadena[0])){
+            T_temperature_handler();
+          }
+          break;
+
+        default:
+          //HAL_UART_Transmit(&huart2, (uint8_t *)"Comando no reconocido\n", strlen("Comando no reconocido\n"), 100); // acá se debe poner una función tipo "No_recognized_command_handler"
+          break;
+      }
+    } else {
+      done();
+    }
+    HAL_UART_Receive_IT(&huart2, cadena, 1);
+  }
+}
 /* USER CODE END 4 */
 
 /**
