@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "LTC2986.h"
+#include "max7219.h"
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"
@@ -52,6 +53,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi2;
+SPI_HandleTypeDef hspi3;
 
 UART_HandleTypeDef huart2;
 
@@ -70,6 +72,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_SPI3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -119,22 +122,33 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI2_Init();
   MX_USART2_UART_Init();
+  MX_SPI3_Init();
   /* USER CODE BEGIN 2 */
   HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
+  max7219_Init(7);
+  max7219_Decode_On();
+
   HAL_UART_Receive_IT(&huart2, cadena, 1);
 
-  HAL_Delay(400);
+  HAL_Delay(4000);
   while(!LTC2986_is_ready(&therms)) {
 	print_status();
   }
+  max7219_Clean();
+  max7219_PrintFtos(DIGIT_8, -3.14, 2);
+  max7219_PrintDigit(DIGIT_4, LETTER_H, false);
+  max7219_PrintDigit(DIGIT_3, LETTER_E, false);
+  max7219_PrintDigit(DIGIT_2, LETTER_L, false);
+  max7219_PrintDigit(DIGIT_1, LETTER_P, false);
+
 
   // Configure LTM
   LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, THERMOCOUPLE_CHANNEL, RTD_CHANNEL);
   LTC2986_configure_sense_resistor(&therms, 5, 100);
   LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, RTD_CHANNEL, 5);
   LTC2986_global_configure(&therms);
-  HAL_Delay(100);
-
+  HAL_Delay(1000);
+  max7219_Clean();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -149,11 +163,19 @@ int main(void)
     for(j = 0; j < THERMOCOUPLES; j++) {
     	i = channels[j];
     	raw_temperature = LTC2986_measure_channel(&therms, i);
+    	raw_temperature = roundf(raw_temperature * 100) / 100; // We round it up to 2 decimals
     	if(isnan(raw_temperature)) {
     		raw_temperature = 10; // There's been an error
+    		// We show the error in the LED display
+  			max7219_PrintDigit(j * 4 + 4, LETTER_E, false);
+  			max7219_PrintDigit(j * 4 + 3, LETTER_E, false);
+  			max7219_PrintDigit(j * 4 + 2, LETTER_E, false);
+  			max7219_PrintDigit(j * 4 + 1, LETTER_E, false);
+    	} else {
+    	    if(raw_temperature > 99.99) raw_temperature = 99.99;
+    	    else if(raw_temperature < 10.00) raw_temperature = 10.00;
+    	    max7219_PrintFtos(j * 4 + 4, raw_temperature, 2); // We update the LED display
     	}
-    	if(raw_temperature > 99.99) raw_temperature = 99.99;
-    	else if(raw_temperature < 10.00) raw_temperature = 10.00;
     	temperatures[j] = (int)(raw_temperature * 100);
     }
   }
@@ -245,6 +267,44 @@ static void MX_SPI2_Init(void)
 }
 
 /**
+  * @brief SPI3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI3_Init(void)
+{
+
+  /* USER CODE BEGIN SPI3_Init 0 */
+
+  /* USER CODE END SPI3_Init 0 */
+
+  /* USER CODE BEGIN SPI3_Init 1 */
+
+  /* USER CODE END SPI3_Init 1 */
+  /* SPI3 parameter configuration*/
+  hspi3.Instance = SPI3;
+  hspi3.Init.Mode = SPI_MODE_MASTER;
+  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi3.Init.NSS = SPI_NSS_SOFT;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi3.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI3_Init 2 */
+
+  /* USER CODE END SPI3_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -297,12 +357,22 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI_CS_GPIO_Port, SPI_CS_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : SPI_CS_Pin */
   GPIO_InitStruct.Pin = SPI_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SPI_CS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SPI3_CS_Pin */
+  GPIO_InitStruct.Pin = SPI3_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SPI3_CS_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
