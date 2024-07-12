@@ -59,7 +59,6 @@ UART_HandleTypeDef huart2;
 uint8_t cadena[1] = "0";
 char last_char = '\0'; // To record last character received
 int same_char_count = 0; // Counter for the consecutive times that a specific character has been received
-int chars_to_expect = -1; // Counter for the digits that should be sent from the SMART in commands like GGG
 float raw_temperature;
 int temperatures[16] = {3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800};
 uint8_t channels[THERMOCOUPLES] = CHANNELS;
@@ -129,8 +128,7 @@ int main(void)
 	print_status();
   }
 
-  // HAL_UART_Transmit(&huart2, (uint8_t *) "Holaaa\n\r", strlen("Holaaa\n\r"), 100);
-  // SECTION: CONFIGURE LTM
+  // Configure LTM
   LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, THERMOCOUPLE_CHANNEL, RTD_CHANNEL);
   LTC2986_configure_sense_resistor(&therms, 5, 100);
   LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, RTD_CHANNEL, 5);
@@ -157,7 +155,6 @@ int main(void)
     	if(raw_temperature > 99.99) raw_temperature = 99.99;
     	else if(raw_temperature < 10.00) raw_temperature = 10.00;
     	temperatures[j] = (int)(raw_temperature * 100);
-
     }
   }
   /* USER CODE END 3 */
@@ -325,8 +322,6 @@ uint8_t char_counter(char c) {
 
   // Si se ha recibido el mismo carácter el número máximo de veces consecutivas
   if (same_char_count >= MAX_COMND_COUNT) {
-    // Responder con un mensaje específico
-    //HAL_UART_Transmit(&huart2, (uint8_t *)"OK\n\r", strlen("OK\n\r"), 100);
     // Reiniciar el contador y el último carácter almacenado
     same_char_count = 0;
     last_char = '\0';
@@ -381,13 +376,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   /* Prevent unused argument(s) compilation warning */
   if(huart->Instance == USART2)
   {
-    if(--chars_to_expect != 0) {
       switch(cadena[0]){
-        case 'I':
-          if(char_counter(cadena[0])){
-            done();
-          }
-          break;
         case 'N':
           if(char_counter(cadena[0])){
             //HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
@@ -397,26 +386,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         case 'T':
           if(char_counter(cadena[0])){
              T_temperature_handler();
-          }
-          break;
-        case 'V':
-          if(char_counter(cadena[0])){
-            chars_to_expect = 3;
-          }
-          break;
-        case 'G':
-          if(char_counter(cadena[0])){
-            chars_to_expect = 3;
-          }
-          break;
-        case 'E':
-          if(char_counter(cadena[0])){
-            chars_to_expect = 18;
-          }
-          break;
-        case 'F':
-          if(char_counter(cadena[0])){
-            chars_to_expect = 3;
           }
           break;
         case 'R':
@@ -429,9 +398,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
           //HAL_UART_Transmit(&huart2, (uint8_t *)"Comando no reconocido\n", strlen("Comando no reconocido\n"), 100); // acá se debe poner una función tipo "No_recognized_command_handler"
           break;
       }
-    } else {
-      done();
-    }
     HAL_UART_Receive_IT(&huart2, cadena, 1);
   }
 }
