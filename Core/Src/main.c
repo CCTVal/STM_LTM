@@ -23,6 +23,8 @@
 /* USER CODE BEGIN Includes */
 #include "LTC2986.h"
 #include "max7219.h"
+#include "keypad.h"
+#include "i2c_lcd.h"
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"
@@ -39,10 +41,29 @@
 
 #define THERMOCOUPLE_CHANNEL (uint8_t) 0x02
 #define RTD_CHANNEL (uint8_t) 0x07
+#define SENSE_CHANNEL (uint8_t) 0x05
 
 #define MAX_COMND_COUNT 3 // Numero maximo de veces consecutivas para el mismo caracter
+
+#define THERMOMETRY_CHIPS 2
 #define THERMOCOUPLES   2
-#define CHANNELS        {2, 7}
+#define THERMOCOUPLES_CHANNELS        {0x02, 0x12}
+
+typedef enum {
+	NORMAL_STATE = 0x0,
+	CALIBRATE_ALL_PROBES_STATE = 0x1,
+	SHOULD_PROBE_STATE = 0x2,
+	CONFIRM_PROBES_STATE = 0x3,
+	ONE_OR_TWO_STATE = 0x4,
+	PLACE_ONLY_POINT_STATE = 0x5,
+	INPUT_ONLY_TEMPERATURE_STATE = 0x6,
+	PLACE_FIRST_POINT_STATE = 0x7,
+	INPUT_FIRST_TEMPERATURE_STATE = 0x8,
+	PLACE_SECOND_POINT_STATE = 0x9,
+	INPUT_SECOND_TEMPERATURE_STATE = 0xA,
+	CALIBRATION_READY = 0xB,
+	CRITICAL_ERROR = 0xF
+} state_t;
 
 /* USER CODE END PD */
 
@@ -52,6 +73,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c3;
+
 SPI_HandleTypeDef hspi2;
 SPI_HandleTypeDef hspi3;
 
@@ -63,8 +86,16 @@ char last_char = '\0'; // To record last character received
 int same_char_count = 0; // Counter for the consecutive times that a specific character has been received
 float raw_temperature;
 int temperatures[16] = {3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800, 3500, 3600, 3700, 3800};
-uint8_t channels[THERMOCOUPLES] = CHANNELS;
+uint8_t thermocouple_channels[THERMOCOUPLES] = THERMOCOUPLES_CHANNELS;
 uint8_t i, j;
+state_t operation_state = NORMAL_STATE;
+
+// Calibration process variables
+uint8_t probe_to_ponder = 0;
+uint8_t calibration_state = 0;
+float calibration_temperature1 = 0;
+float calibration_temperature2 = 0;
+char LCD_buffer[34];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,19 +104,25 @@ static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_SPI3_Init(void);
+static void MX_I2C3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-LTC2986_t therms = {&hspi2, {SPI_CS_GPIO_Port, SPI_CS_Pin}};
+LTC2986_t therms[THERMOMETRY_CHIPS] = {
+		{&hspi2, {LTM1_CS_GPIO_Port, LTM1_CS_Pin}},
+		{&hspi2, {LTM2_CS_GPIO_Port, LTM2_CS_Pin}}
+};
 
-void print_status() {
-	uint8_t temp_var = LTC2986_read_status(&therms);
-	char buffer[32];
+void print_status(int chip) {
+	uint8_t temp_var = LTC2986_read_status(therms + chip);
+	char buffer[48];
 	HAL_UART_Transmit(&huart2, (uint8_t *) "status = 0x", strlen("status = 0x"), 100);
-	sprintf(buffer, "%02X\n\r", (int) temp_var);
+	sprintf(buffer, "%02X\n\r chip = ", (unsigned int) temp_var);
+	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+	sprintf(buffer, "%01X\n\r", chip);
 	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
 	HAL_Delay(200);
 }
@@ -123,32 +160,28 @@ int main(void)
   MX_SPI2_Init();
   MX_USART2_UART_Init();
   MX_SPI3_Init();
+  MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
-  HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
-  max7219_Init(7);
+
+  max7219_Init(3);
   max7219_Decode_On();
 
-  HAL_UART_Receive_IT(&huart2, cadena, 1);
-
   HAL_Delay(4000);
-  while(!LTC2986_is_ready(&therms)) {
-	print_status();
-  }
   max7219_Clean();
-  max7219_PrintFtos(DIGIT_8, -3.14, 2);
-  max7219_PrintDigit(DIGIT_4, LETTER_H, false);
-  max7219_PrintDigit(DIGIT_3, LETTER_E, false);
-  max7219_PrintDigit(DIGIT_2, LETTER_L, false);
-  max7219_PrintDigit(DIGIT_1, LETTER_P, false);
-
-
-  // Configure LTM
-  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, THERMOCOUPLE_CHANNEL, RTD_CHANNEL);
-  LTC2986_configure_sense_resistor(&therms, 5, 100);
-  LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, RTD_CHANNEL, 5);
-  LTC2986_global_configure(&therms);
+  max7219_PrintFtos(DIGIT_1, -3.14, 2);
+  max7219_PrintDigit(DIGIT_5, LETTER_H, false);
+  max7219_PrintDigit(DIGIT_6, LETTER_E, false);
+  max7219_PrintDigit(DIGIT_7, LETTER_L, false);
+  max7219_PrintDigit(DIGIT_8, LETTER_P, false);
+  max7219_PrintFtos(9, -4.25, 2);
+  max7219_PrintDigit(13, LETTER_E, false);
+  max7219_PrintDigit(14, LETTER_H, false);
+  max7219_PrintDigit(15, LETTER_E, false);
+  max7219_PrintDigit(16, LETTER_H, false);
   HAL_Delay(1000);
-  max7219_Clean();
+
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -158,26 +191,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-	// SECTION: Read LTM channels and update temperatures[]
-    for(j = 0; j < THERMOCOUPLES; j++) {
-    	i = channels[j];
-    	raw_temperature = LTC2986_measure_channel(&therms, i);
-    	raw_temperature = roundf(raw_temperature * 100) / 100; // We round it up to 2 decimals
-    	if(isnan(raw_temperature)) {
-    		raw_temperature = 10; // There's been an error
-    		// We show the error in the LED display
-  			max7219_PrintDigit(j * 4 + 4, LETTER_E, false);
-  			max7219_PrintDigit(j * 4 + 3, LETTER_E, false);
-  			max7219_PrintDigit(j * 4 + 2, LETTER_E, false);
-  			max7219_PrintDigit(j * 4 + 1, LETTER_E, false);
-    	} else {
-    	    if(raw_temperature > 99.99) raw_temperature = 99.99;
-    	    else if(raw_temperature < 10.00) raw_temperature = 10.00;
-    	    max7219_PrintFtos(j * 4 + 4, raw_temperature, 2); // We update the LED display
-    	}
-    	temperatures[j] = (int)(raw_temperature * 100);
-    }
+	  //max7219_Clean();
+	  HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
@@ -226,6 +241,40 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C3_Init(void)
+{
+
+  /* USER CODE BEGIN I2C3_Init 0 */
+
+  /* USER CODE END I2C3_Init 0 */
+
+  /* USER CODE BEGIN I2C3_Init 1 */
+
+  /* USER CODE END I2C3_Init 1 */
+  hi2c3.Instance = I2C3;
+  hi2c3.Init.ClockSpeed = 100000;
+  hi2c3.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c3.Init.OwnAddress1 = 0;
+  hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c3.Init.OwnAddress2 = 0;
+  hi2c3.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c3.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C3_Init 2 */
+
+  /* USER CODE END I2C3_Init 2 */
+
 }
 
 /**
@@ -349,23 +398,46 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SPI_CS_GPIO_Port, SPI_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, SPI_CS_Pin|SPI_CS2_Pin|SPI_CS3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|keypadColumn1_Pin|keypadColumn2_Pin|keypadColumn3_Pin
+                          |keypadColumn4_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : SPI_CS_Pin */
-  GPIO_InitStruct.Pin = SPI_CS_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LTM1_CS_Pin|LTM2_CS_Pin|LTM3_CS_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : SPI_CS_Pin SPI_CS2_Pin SPI_CS3_Pin */
+  GPIO_InitStruct.Pin = SPI_CS_Pin|SPI_CS2_Pin|SPI_CS3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(SPI_CS_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LD2_Pin keypadColumn1_Pin keypadColumn2_Pin keypadColumn3_Pin
+                           keypadColumn4_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin|keypadColumn1_Pin|keypadColumn2_Pin|keypadColumn3_Pin
+                          |keypadColumn4_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : keypadRow1_Pin keypadRow2_Pin keypadRow3_Pin keypadRow4_Pin */
+  GPIO_InitStruct.Pin = keypadRow1_Pin|keypadRow2_Pin|keypadRow3_Pin|keypadRow4_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : SPI3_CS_Pin */
   GPIO_InitStruct.Pin = SPI3_CS_Pin;
@@ -373,6 +445,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SPI3_CS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LTM1_CS_Pin LTM2_CS_Pin LTM3_CS_Pin */
+  GPIO_InitStruct.Pin = LTM1_CS_Pin|LTM2_CS_Pin|LTM3_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -423,7 +502,11 @@ void T_temperature_handler(){
   int i=0;
   for(i=0;i<16;i++){
     temperature_str[i*4 + 6]= '\0';
-    sprintf(temperature_str + (3 + 4*i), "%04d", temperatures[i]);  // falta ver que hacer para que funcione cuando el numero tiene menos de 4 digitos.
+    if(temperatures[i]) {
+      sprintf(temperature_str + (3 + 4*i), "%04d", temperatures[i]);
+    } else {  // error
+      sprintf(temperature_str + (3 + 4*i), "0000");
+    }
   }
 
   unsigned checksum = 0;
@@ -442,8 +525,7 @@ void T_temperature_handler(){
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-
-  /* Prevent unused argument(s) compilation warning */
+  // Prevent unused argument(s) compilation warning
   if(huart->Instance == USART2)
   {
       switch(cadena[0]){
@@ -471,6 +553,106 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     HAL_UART_Receive_IT(&huart2, cadena, 1);
   }
 }
+
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  uint16_t key = getKeyAsInt(GPIO_Pin);
+  if(key == KEYPAD_ERROR_KEY) {
+    return;
+  }
+  if(key == 0xB) {
+	operation_state = NORMAL_STATE;
+	lcd_print("Cancel");
+    return;
+  }
+  switch(operation_state) {
+    case NORMAL_STATE:
+      if(key == 0xC) {
+	    operation_state = CALIBRATE_ALL_PROBES_STATE;
+	    lcd_print("Calibrate all\nprobes? (yes/no)");
+      }
+	  break;
+    case CALIBRATE_ALL_PROBES_STATE:
+      if(key == 1 || key == 0xC) { // Yes
+    	operation_state = CONFIRM_PROBES_STATE;
+    	lcd_print("Confirm probes");
+      } else if(key == 2) { // No
+    	operation_state = SHOULD_PROBE_STATE;
+
+
+    	probe_to_ponder = 0;
+    	sprintf(LCD_buffer, "Calibrate probe\n%d? (yes/no)", ++probe_to_ponder );
+    	lcd_print(LCD_buffer);
+      }
+      break;
+    case SHOULD_PROBE_STATE:
+      if(key == 1 || key == 0xC) { // Yes
+    	// Probe should be considered
+      } else if(key == 2) { // No
+    	// Probe should not be considered
+      }
+      sprintf(LCD_buffer, "Calibrate probe\n%d? (yes/no)", ++probe_to_ponder );
+      if(probe_to_ponder > 15) {
+        operation_state = CONFIRM_PROBES_STATE;
+        lcd_print("Confirm probes");
+        break;
+      }
+      lcd_print(LCD_buffer);
+      break;
+    case CONFIRM_PROBES_STATE:
+      if(key == 0xC) {
+        operation_state = ONE_OR_TWO_STATE;
+        lcd_print("How many points?\n(1/2)");
+      }
+      break;
+    case ONE_OR_TWO_STATE:
+      if(key == 1) {
+        operation_state = PLACE_ONLY_POINT_STATE;
+        lcd_print("Place probes to\nref. temp."); // print "place probes to reference temperature point"
+      } else if(key == 2) {
+        operation_state = PLACE_FIRST_POINT_STATE;
+        lcd_print("Place probes to\nref. temp. 1"); // print "place probes to reference temperature point"
+      }
+      break;
+    case PLACE_ONLY_POINT_STATE:
+      if(key == 0xC) {
+        operation_state = INPUT_ONLY_TEMPERATURE_STATE;
+        lcd_print("Input\ntemperature");
+      }
+      break;
+    case INPUT_ONLY_TEMPERATURE_STATE:
+      if(key == 0xC) {
+    	calibration_state = 1; // one point calibration
+    	calibration_temperature1 = key * 10;
+        operation_state = CALIBRATION_READY;
+        lcd_print("Calibration\nready!");
+      } else {
+    	calibration_temperature1 = key * 10; // TODO
+      }
+      break;
+    case PLACE_FIRST_POINT_STATE:
+      operation_state = INPUT_FIRST_TEMPERATURE_STATE;
+      break;
+    case INPUT_FIRST_TEMPERATURE_STATE:
+      operation_state = PLACE_SECOND_POINT_STATE;
+      break;
+    case PLACE_SECOND_POINT_STATE:
+      operation_state = INPUT_SECOND_TEMPERATURE_STATE;
+      break;
+    case INPUT_SECOND_TEMPERATURE_STATE:
+      operation_state = CALIBRATION_READY;
+      break;
+
+    default:
+	    operation_state = NORMAL_STATE;
+	    lcd_clear();
+	    break;
+    }
+  return;
+}
+
+
 /* USER CODE END 4 */
 
 /**

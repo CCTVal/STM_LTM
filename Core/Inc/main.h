@@ -57,10 +57,38 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define SPI_CS_Pin GPIO_PIN_4
-#define SPI_CS_GPIO_Port GPIOA
-#define SPI3_CS_Pin GPIO_PIN_4
-#define SPI3_CS_GPIO_Port GPIOB
+#define SPI_CS_Pin GPIO_PIN_13
+#define SPI_CS_GPIO_Port GPIOC
+#define SPI_CS2_Pin GPIO_PIN_14
+#define SPI_CS2_GPIO_Port GPIOC
+#define SPI_CS3_Pin GPIO_PIN_15
+#define SPI_CS3_GPIO_Port GPIOC
+#define LD2_Pin GPIO_PIN_5
+#define LD2_GPIO_Port GPIOA
+#define keypadRow1_Pin GPIO_PIN_12
+#define keypadRow1_GPIO_Port GPIOB
+#define keypadRow2_Pin GPIO_PIN_13
+#define keypadRow2_GPIO_Port GPIOB
+#define keypadRow3_Pin GPIO_PIN_14
+#define keypadRow3_GPIO_Port GPIOB
+#define keypadRow4_Pin GPIO_PIN_15
+#define keypadRow4_GPIO_Port GPIOB
+#define keypadColumn1_Pin GPIO_PIN_9
+#define keypadColumn1_GPIO_Port GPIOA
+#define keypadColumn2_Pin GPIO_PIN_10
+#define keypadColumn2_GPIO_Port GPIOA
+#define keypadColumn3_Pin GPIO_PIN_11
+#define keypadColumn3_GPIO_Port GPIOA
+#define keypadColumn4_Pin GPIO_PIN_12
+#define keypadColumn4_GPIO_Port GPIOA
+#define SPI3_CS_Pin GPIO_PIN_2
+#define SPI3_CS_GPIO_Port GPIOD
+#define LTM1_CS_Pin GPIO_PIN_5
+#define LTM1_CS_GPIO_Port GPIOB
+#define LTM2_CS_Pin GPIO_PIN_6
+#define LTM2_CS_GPIO_Port GPIOB
+#define LTM3_CS_Pin GPIO_PIN_7
+#define LTM3_CS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

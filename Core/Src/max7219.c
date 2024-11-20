@@ -79,16 +79,43 @@ void max7219_SendData(uint8_t addr, uint8_t data, uint8_t chip)
 {
 	CS_SET();
 	uint8_t no_op_address = REG_NO_OP;
+	/*
+#if NUMBER_OF_CHIPS == 2
+	if(chip == 1) {
+		HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
+		//HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
+		//HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
+	} else {
+		//HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
+		//HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
+		HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
+	}
+#endif
+#if NUMBER_OF_CHIPS == 1
+	HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
+	HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
+#endif
+	*/
 	for(int i = 0; i < NUMBER_OF_CHIPS - chip; i++) {
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
+		HAL_GPIO_WritePin(LD2_GPIO_Port,LD2_Pin, GPIO_PIN_SET); // DEBUG
 	}
+
 	HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
 	HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
 	for(int i = 1; i < chip; i++) {
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
+		//HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin); // No uses toggle, enciendelo no mas
 	}
+
 	CS_RESET();
 }
 
@@ -173,7 +200,7 @@ MAX7219_Digits max7219_PrintItos(MAX7219_Digits position, int value)
 		if(position > 0)
 		{
 			max7219_SendData(position, MINUS, chip);
-			position--;
+			position++;
 		}
 		value = -value;
 	}
@@ -188,7 +215,7 @@ MAX7219_Digits max7219_PrintItos(MAX7219_Digits position, int value)
 	if(position > 0)
 	{
 		max7219_SendData(position, value/i, chip);
-		position--;
+		position++;
 	}
 
 	i /= 10;
@@ -198,7 +225,7 @@ MAX7219_Digits max7219_PrintItos(MAX7219_Digits position, int value)
 		if(position > 0)
 		{
 			max7219_SendData(position, (value % (i * 10)) / i, chip);
-			position--;
+			position++;
 		}
 
 		i /= 10;
@@ -224,7 +251,7 @@ MAX7219_Digits max7219_PrintNtos(MAX7219_Digits position, uint32_t value, uint8_
 			if(position > 0u)
 			{
 				max7219_SendData(position, (value / i) % 10u, chip);
-				position--;
+				position++;
 			}
 
 			i /= 10u;
@@ -252,7 +279,7 @@ MAX7219_Digits max7219_PrintFtos(MAX7219_Digits position, float value, uint8_t n
 		if(position > 0)
 		{
 			max7219_SendData(position, MINUS, chip);
-			position--;
+			position++;
 		}
 
 		value = -value;
@@ -262,7 +289,7 @@ MAX7219_Digits max7219_PrintFtos(MAX7219_Digits position, float value, uint8_t n
 
 	if (n > 0u)
 	{
-		max7219_PrintDigit(position + 1 + ((chip - 1) * NUMBER_OF_DIGITS), ((int32_t) value) % 10, true);
+		max7219_PrintDigit(position - 1 + ((chip - 1) * NUMBER_OF_DIGITS), ((int32_t) value) % 10, true);
 
 		position = max7219_PrintNtos(position + ((chip - 1) * NUMBER_OF_DIGITS), (uint32_t) (value * (float) lcdPow10(n)), n);
 	}

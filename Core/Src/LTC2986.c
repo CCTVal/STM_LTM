@@ -112,7 +112,7 @@ void LTC2986_configure_rtd(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channe
 	configuration = type << 27;
 	configuration |= (sense_channel) << 22;
 	configuration |= 0x0 << 20; // 2-wire
-	configuration |= 0x0 << 18; // no rotation, no sharing
+	configuration |= 0x1 << 18; // no rotation, sharing
 	configuration |= 0x7 << 14; // 500 uA
 	configuration |= 0x1 << 12; // American curve for the RTD.
 	uint8_t temp[4];
