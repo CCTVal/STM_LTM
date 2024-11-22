@@ -151,9 +151,9 @@ void LTC2986_configure_thermocouple(LTC2986_t *LTM, LTC2986_sensor_t type, uint8
   */
 void LTC2986_configure_sense_resistor(LTC2986_t *LTM, uint8_t channel_number, float resistance) {
 	uint32_t configuration = 29 << 27;
-	if(resistance > 131.07) {
+	if(resistance > 131071) {
 		// This is a programming error.
-		resistance = 131;
+		resistance = 131071;
 	}
 	configuration |= (uint32_t) ((int) resistance* 1024);
 	uint8_t temp[4];
