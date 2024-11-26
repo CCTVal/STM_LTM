@@ -91,14 +91,18 @@ void lcd_send_string (char *str)
 void lcd_print(char *str)
 {
 	lcd_clear();
+	HAL_Delay(100);
 	int row = 0;
 	lcd_put_cur(row++, 0);
+	HAL_Delay(100);
 	while (*str) {
 		if(*str == '\n' || *str == '\r') {
 			lcd_put_cur(row++, 0);
+			HAL_Delay(100);
 			str++;
 			continue;
 		}
 		lcd_send_data (*str++);
+		HAL_Delay(100);
 	}
 }

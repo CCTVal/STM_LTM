@@ -63,8 +63,6 @@ void Error_Handler(void);
 #define SPI_CS2_GPIO_Port GPIOC
 #define SPI_CS3_Pin GPIO_PIN_15
 #define SPI_CS3_GPIO_Port GPIOC
-#define LD2_Pin GPIO_PIN_5
-#define LD2_GPIO_Port GPIOA
 #define keypadRow1_Pin GPIO_PIN_12
 #define keypadRow1_GPIO_Port GPIOB
 #define keypadRow2_Pin GPIO_PIN_13

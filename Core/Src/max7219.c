@@ -105,7 +105,6 @@ void max7219_SendData(uint8_t addr, uint8_t data, uint8_t chip)
 	for(int i = 0; i < NUMBER_OF_CHIPS - chip; i++) {
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
-		HAL_GPIO_WritePin(LD2_GPIO_Port,LD2_Pin, GPIO_PIN_SET); // DEBUG
 	}
 
 	HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
