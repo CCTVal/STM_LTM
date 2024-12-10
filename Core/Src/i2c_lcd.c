@@ -62,11 +62,11 @@ void lcd_init (void)
 	// 4 bit initialisation
 	HAL_Delay(50);  // wait for >40ms
 	lcd_send_cmd (0x30);
-	HAL_Delay(5);  // wait for >4.1ms
+	HAL_Delay(20);  // wait for >4.1ms
 	lcd_send_cmd (0x30);
-	HAL_Delay(1);  // wait for >100us
+	HAL_Delay(20);  // wait for >100us
 	lcd_send_cmd (0x30);
-	HAL_Delay(10);
+	HAL_Delay(20);
 	lcd_send_cmd (0x20);  // 4bit mode
 	HAL_Delay(10);
 
@@ -81,6 +81,7 @@ void lcd_init (void)
 	lcd_send_cmd (0x06); //Entry mode set --> I/D = 1 (increment cursor) & S = 0 (no shift)
 	HAL_Delay(1);
 	lcd_send_cmd (0x0C); //Display on/off control --> D = 1, C and B = 0. (Cursor and blink, last two bits)
+	HAL_Delay(500);
 }
 
 void lcd_send_string (char *str)
@@ -92,12 +93,12 @@ void lcd_print(char *str)
 {
 	lcd_clear();
 	HAL_Delay(100);
-	int row = 0;
-	lcd_put_cur(row++, 0);
+	//const int row = 0;
+	lcd_put_cur(0, 0);
 	HAL_Delay(100);
 	while (*str) {
 		if(*str == '\n' || *str == '\r') {
-			lcd_put_cur(row++, 0);
+			lcd_put_cur(1, 0);
 			HAL_Delay(100);
 			str++;
 			continue;

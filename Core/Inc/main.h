@@ -65,12 +65,16 @@ void Error_Handler(void);
 #define SPI_CS3_GPIO_Port GPIOC
 #define keypadRow1_Pin GPIO_PIN_12
 #define keypadRow1_GPIO_Port GPIOB
+#define keypadRow1_EXTI_IRQn EXTI15_10_IRQn
 #define keypadRow2_Pin GPIO_PIN_13
 #define keypadRow2_GPIO_Port GPIOB
+#define keypadRow2_EXTI_IRQn EXTI15_10_IRQn
 #define keypadRow3_Pin GPIO_PIN_14
 #define keypadRow3_GPIO_Port GPIOB
+#define keypadRow3_EXTI_IRQn EXTI15_10_IRQn
 #define keypadRow4_Pin GPIO_PIN_15
 #define keypadRow4_GPIO_Port GPIOB
+#define keypadRow4_EXTI_IRQn EXTI15_10_IRQn
 #define keypadColumn1_Pin GPIO_PIN_9
 #define keypadColumn1_GPIO_Port GPIOA
 #define keypadColumn2_Pin GPIO_PIN_10
@@ -81,12 +85,18 @@ void Error_Handler(void);
 #define keypadColumn4_GPIO_Port GPIOA
 #define SPI3_CS_Pin GPIO_PIN_2
 #define SPI3_CS_GPIO_Port GPIOD
+#define ADS_CS_Pin GPIO_PIN_3
+#define ADS_CS_GPIO_Port GPIOB
+#define ADS_DRDY_Pin GPIO_PIN_4
+#define ADS_DRDY_GPIO_Port GPIOB
 #define LTM1_CS_Pin GPIO_PIN_5
 #define LTM1_CS_GPIO_Port GPIOB
 #define LTM2_CS_Pin GPIO_PIN_6
 #define LTM2_CS_GPIO_Port GPIOB
 #define LTM3_CS_Pin GPIO_PIN_7
 #define LTM3_CS_GPIO_Port GPIOB
+#define ADS_SYNC_Pin GPIO_PIN_9
+#define ADS_SYNC_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

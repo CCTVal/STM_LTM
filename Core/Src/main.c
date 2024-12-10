@@ -24,11 +24,13 @@
 #include "LTC2986.h"
 #include "max7219.h"
 #include "i2c_lcd.h"
+#include "keypad.h"
 #include "string.h"
 #include "stdio.h"
 #include "stdbool.h"
 #include "stdlib.h"
 #include <math.h>
+#include "ads1256.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -82,6 +84,7 @@ static void MX_I2C3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 LTC2986_t therms = {&hspi2, {LTM3_CS_GPIO_Port, LTM3_CS_Pin}};
+ADS125X_t adc1;
 
 /*
 void print_status() {
@@ -133,16 +136,41 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   HAL_GPIO_WritePin(LTM3_CS_GPIO_Port, LTM3_CS_Pin, 1);
+  HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, 1);
   HAL_GPIO_WritePin(LTM2_CS_GPIO_Port, LTM2_CS_Pin, 1);
   HAL_UART_Receive_IT(&huart2, cadena, 1);
+  char buffer[100];
   //HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
 
   //char buffer[20];
   HAL_Delay(400);
 
+  keypad_Init();
   lcd_init();
 
   HAL_UART_Transmit(&huart2, (uint8_t *) "Init-", strlen("Init-"), 200);
+
+
+  HAL_UART_Transmit(&huart2, (uint8_t *) "ADC config...", strlen("ADC config..."), 200);
+
+
+  adc1 = ADS1256_InitializeADC(&hspi2, ADS_DRDY_Pin, ADS_DRDY_GPIO_Port,
+		                       ADS_SYNC_Pin, ADS_SYNC_GPIO_Port,
+							   ADS_CS_Pin, ADS_CS_GPIO_Port,
+                               2.5);
+  // 10 SPS / PGA=1 / buffer off
+  ADS1256_setPGA(&adc1, 1);
+  ADS1256_setMUX(&adc1, 0x0F); // Channel 0 with COMMON input as reference
+  ADS1256_setDRATE(&adc1, ADS1256_DRATE_5SPS);
+  //ADS125X_Init(&adc1, &hspi2, ADS125X_DRATE_100SPS, ADS125X_PGA1, 0);
+  ;
+  sprintf(buffer, "PGA: %ld\n\r", ADS1256_readRegister(&adc1, ADS1256_IO_REG));
+  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+  sprintf(buffer, "MUX: %ld\n\r", ADS1256_readRegister(&adc1, ADS1256_MUX_REG));
+  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+  sprintf(buffer, "DRATE: %ld\n\r", ADS1256_readRegister(&adc1, ADS1256_DRATE_REG));
+  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+  HAL_UART_Transmit(&huart2, (uint8_t *) "...done\n\r", strlen("...done\n\r"), 200);
 
   max7219_Init(3);
   max7219_Decode_On();
@@ -160,11 +188,10 @@ int main(void)
   max7219_PrintDigit(15, LETTER_L, false);
   max7219_PrintDigit(16, LETTER_P, false);
   HAL_Delay(1000);
-
-  while(!LTC2986_is_ready(&therms));
+/*
   HAL_UART_Transmit(&huart2, (uint8_t *) "LTC ready", strlen("LTC ready"), 200);
   uint8_t buffer1 = 0;
-  char buffer[100];
+
   LTC2986_global_configure(&therms);
   // We print the global register:
     HAL_UART_Transmit(&huart2, (uint8_t *) "global register = ", strlen("global register = "), 200);
@@ -184,6 +211,19 @@ int main(void)
   HAL_Delay(1500);
   HAL_UART_Transmit(&huart2, (uint8_t *) "Holaaa\n\r", strlen("Holaaa\n\r"), 100);
   lcd_print("Hola\nLabthermics");
+
+  float temp_a = LTC2986_measure_channel(&therms, 10);
+  HAL_UART_Transmit(&huart2, (uint8_t *) "PT 100 = ", strlen("PT 100 = "), 200);
+  HAL_Delay(500);
+  sprintf(buffer, "%.4f\n\r", temp_a);
+  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+
+  temp_a = LTC2986_measure_channel(&therms, 1);
+  HAL_UART_Transmit(&huart2, (uint8_t *) "therm_1 = ", strlen("therm_1 = "), 200);
+  HAL_Delay(500);
+  sprintf(buffer, "%.4f\n\r", temp_a);
+  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+  */
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -194,9 +234,27 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  float volt = 0.0f;
+	  //ADS125X_ChannelDiff_Set(&adc1, ADS125X_MUXP_AIN0, ADS125X_MUXN_AIN1);
+	  //ADS1256_setMUX(&adc1, 0x1F);
+	  //HAL_Delay(400);
+	  //long rawConversion = ADS1256_readSingle(&adc1); //Reading the raw value from a previously selected input, passing it to a variable
 
+	  ADS1256_setPGA(&adc1, 1);
+	  ADS1256_setMUX(&adc1, 0x0F); // Channel 0 with COMMON input as reference
+	  ADS1256_setDRATE(&adc1, ADS1256_DRATE_1000SPS);
+	  for(int i = 0; i < 1; i++) {
+	    long rawConversion = ADS1256_readSingle(&adc1);
+        volt = ADS1256_convertToVoltage(&adc1, rawConversion); //Converting the above conversion into a floating point number
+	    sprintf(buffer, "V%d= %.4f\n\r", i, volt);
+	    HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+	    HAL_Delay(400);
+	  }
+/*
+	  HAL_UART_Transmit(&huart2, (uint8_t *) "Ok\n\r", strlen("Ok\n\r"), 200);
+      float temp = 0;
+	  temp = LTC2986_measure_channel(&therms, 1);
 
-	  float temp = LTC2986_measure_channel(&therms, 1);
 	  temperatures[0] = (int)(temp * 100);
 	  if(temperatures[0] > 9999) temperatures[0] = 9999;
 	  else if(temperatures[0] < 1000) temperatures[0] = 1000;
@@ -217,6 +275,8 @@ int main(void)
 	  for(int i = 3; i < 16; i++) {
 		  temperatures[i] = 3500;
 	  }
+*/
+
 	  //char con[8];
 	  //sprintf(con,"%.4f",temp);
 	  //sprintf(con,"%.4f", temp);
@@ -296,7 +356,7 @@ static void MX_I2C3_Init(void)
 
   /* USER CODE END I2C3_Init 1 */
   hi2c3.Instance = I2C3;
-  hi2c3.Init.ClockSpeed = 90000;
+  hi2c3.Init.ClockSpeed = 100000;
   hi2c3.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c3.Init.OwnAddress1 = 0;
   hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -450,7 +510,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LTM1_CS_Pin|LTM2_CS_Pin|LTM3_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, ADS_CS_Pin|LTM1_CS_Pin|LTM2_CS_Pin|LTM3_CS_Pin
+                          |ADS_SYNC_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : SPI_CS_Pin SPI_CS2_Pin SPI_CS3_Pin */
   GPIO_InitStruct.Pin = SPI_CS_Pin|SPI_CS2_Pin|SPI_CS3_Pin;
@@ -462,7 +523,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pins : keypadRow1_Pin keypadRow2_Pin keypadRow3_Pin keypadRow4_Pin */
   GPIO_InitStruct.Pin = keypadRow1_Pin|keypadRow2_Pin|keypadRow3_Pin|keypadRow4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : keypadColumn1_Pin keypadColumn2_Pin keypadColumn3_Pin keypadColumn4_Pin */
@@ -479,12 +540,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SPI3_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LTM1_CS_Pin LTM2_CS_Pin LTM3_CS_Pin */
-  GPIO_InitStruct.Pin = LTM1_CS_Pin|LTM2_CS_Pin|LTM3_CS_Pin;
+  /*Configure GPIO pins : ADS_CS_Pin LTM1_CS_Pin LTM2_CS_Pin LTM3_CS_Pin
+                           ADS_SYNC_Pin */
+  GPIO_InitStruct.Pin = ADS_CS_Pin|LTM1_CS_Pin|LTM2_CS_Pin|LTM3_CS_Pin
+                          |ADS_SYNC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ADS_DRDY_Pin */
+  GPIO_InitStruct.Pin = ADS_DRDY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(ADS_DRDY_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -557,9 +630,9 @@ void T_temperature_handler_V2(){
   }
 }
 
+// SMART-1000 communication handler
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-
   /* Prevent unused argument(s) compilation warning */
   if(huart->Instance == USART2)
   {
@@ -617,6 +690,23 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     }
     HAL_UART_Receive_IT(&huart2, cadena, 1);
   }
+}
+
+// Keypad handler
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  HAL_UART_Transmit(&huart2, (uint8_t *) "ExtI\n\r", strlen("ExtI\n\r"), 200);
+  uint16_t key = getKeyAsInt(GPIO_Pin);
+  if(key == KEYPAD_ERROR_KEY) {
+    return;
+  }
+  char buffer[100];
+  //lcd_print("key = \n");
+  HAL_UART_Transmit(&huart2, (uint8_t *) "key = ", strlen("key = "), 200);
+
+  sprintf(buffer, "%d\n\r", key);
+  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+
 }
 
 /* USER CODE END 4 */

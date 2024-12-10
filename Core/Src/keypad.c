@@ -13,6 +13,7 @@ void keypad_Init(){
   HAL_GPIO_WritePin(keypadColumn1_GPIO_Port, keypadColumn1_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(keypadColumn2_GPIO_Port, keypadColumn2_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(keypadColumn3_GPIO_Port, keypadColumn3_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, GPIO_PIN_SET);
 }
 
 uint16_t getKeyAsInt(uint16_t GPIO_Pin) {
@@ -57,8 +58,13 @@ uint16_t getKeyAsInt(uint16_t GPIO_Pin) {
 	    if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
 	      column = 3;
 	    }
+	    HAL_GPIO_WritePin(keypadColumn3_GPIO_Port, keypadColumn3_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, GPIO_PIN_RESET);
+		if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
+		  column = 4;
+		}
 	    previousMillis = currentMillis;
-	    button = column + row * 3;
+	    button = column + row * 3; // TODO: Adapt this to the proper keypad using actual dimensions
 	    if(button == 10) { // asterisk
 	    	button = 11;
 	    } else if (button == 11) { // zero
@@ -68,7 +74,7 @@ uint16_t getKeyAsInt(uint16_t GPIO_Pin) {
 	    }
 
 	  }
-	  HAL_GPIO_WritePin(keypadColumn3_GPIO_Port, keypadColumn3_Pin, GPIO_PIN_SET);
+	  HAL_GPIO_WritePin(keypadColumn3_GPIO_Port, keypadColumn4_Pin, GPIO_PIN_SET);
 	  return(button);
 }
 char getKeyAsChar(uint16_t GPIO_Pin)
