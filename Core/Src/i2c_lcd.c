@@ -59,18 +59,16 @@ void lcd_put_cur(int row, int col)
 
 void lcd_init (void)
 {
-	// 4 bit initialisation
+	// 4 bit initialization
 	HAL_Delay(50);  // wait for >40ms
 	lcd_send_cmd (0x30);
 	HAL_Delay(5);  // wait for >4.1ms
 	lcd_send_cmd (0x30);
 	HAL_Delay(1);  // wait for >100us
-	lcd_send_cmd (0x30);
-	HAL_Delay(10);
-	lcd_send_cmd (0x20);  // 4bit mode
+	lcd_send_cmd (0x32); // 4-bit mode
 	HAL_Delay(10);
 
-  // dislay initialisation
+  // display initialization
 	lcd_send_cmd (0x28); // Function set --> DL=0 (4 bit mode), N = 1 (2 line display) F = 0 (5x8 characters)
 	HAL_Delay(1);
 	lcd_send_cmd (0x08); //Display on/off control --> D=0,C=0, B=0  ---> display off
@@ -91,18 +89,14 @@ void lcd_send_string (char *str)
 void lcd_print(char *str)
 {
 	lcd_clear();
-	HAL_Delay(100);
 	int row = 0;
 	lcd_put_cur(row++, 0);
-	HAL_Delay(100);
 	while (*str) {
 		if(*str == '\n' || *str == '\r') {
 			lcd_put_cur(row++, 0);
-			HAL_Delay(100);
 			str++;
 			continue;
 		}
 		lcd_send_data (*str++);
-		HAL_Delay(100);
 	}
 }
