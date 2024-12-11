@@ -83,16 +83,6 @@ static void MX_I2C3_Init(void);
 /* USER CODE BEGIN 0 */
 LTC2986_t therms = {&hspi2, {LTM3_CS_GPIO_Port, LTM3_CS_Pin}};
 
-/*
-void print_status() {
-	uint8_t temp_var = LTC2986_read_status(&therms);
-	char buffer[32];
-	HAL_UART_Transmit(&huart2, (uint8_t *) "status = 0x", strlen("status = 0x"), 100);
-	sprintf(buffer, "%02X\n\r", (int) temp_var);
-	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
-	HAL_Delay(200);
-}*/
-
 /* USER CODE END 0 */
 
 /**
@@ -132,22 +122,48 @@ int main(void)
   MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_GPIO_WritePin(LTM3_CS_GPIO_Port, LTM3_CS_Pin, 1);
-  HAL_GPIO_WritePin(LTM2_CS_GPIO_Port, LTM2_CS_Pin, 1);
   HAL_UART_Receive_IT(&huart2, cadena, 1);
-  //HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
 
-  //char buffer[20];
-  HAL_Delay(400);
+  /*
+   *
+   * LTM INIT
+   *
+   */
+  HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
+  HAL_Delay(400); // Delay for LTM init
+  HAL_UART_Transmit(&huart2, (uint8_t *) "LTM initializing\n\r", strlen("LTM initializing\n\r"), 200);
+  while(!LTC2986_is_ready(&therms));
+  HAL_UART_Transmit(&huart2, (uint8_t *) "Config:\n\n\r", strlen("Config:\n\n\r"), 200);
+  LTC2986_global_configure(&therms);
+  HAL_UART_Transmit(&huart2, (uint8_t *) "General configuration OK\n\r", strlen("General configuration OK\n\r"), 200);
+  LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, 10, 8);
+  HAL_UART_Transmit(&huart2, (uint8_t *) "PT100 config OK\n\r", strlen("PT100 config OK\n\r"), 200);
+  LTC2986_configure_sense_resistor(&therms, 8, 1000);
+  HAL_UART_Transmit(&huart2, (uint8_t *) "Sense R config OK\n\r", strlen("Sense R config OK\n\r"), 200);
+  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, 1, 10);
+  HAL_UART_Transmit(&huart2, (uint8_t *) "CH10 Thermocouple Config OK\n\r", strlen("CH10 Thermocouple Config OK\n\r"), 200);
+  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, 2, 10);
+  HAL_UART_Transmit(&huart2, (uint8_t *) "CH2 Thermocouple Config OK\n\r", strlen("CH2 Thermocouple Config OK\n\r"), 200);
 
+  /*
+   *
+   * LCD INIT
+   *
+   */
   lcd_init();
+  lcd_init();
+  lcd_init();
+  HAL_Delay(1500);
+  lcd_print("Hola\nLabthermics");
 
-  HAL_UART_Transmit(&huart2, (uint8_t *) "Init-", strlen("Init-"), 200);
-
+  /*
+   *
+   * LED INIT
+   *
+   */
   max7219_Init(3);
   max7219_Decode_On();
-
-  HAL_Delay(4000);
+  HAL_Delay(4000); //Explain this Delay
   max7219_Clean();
   max7219_PrintFtos(DIGIT_1, -3.14, 2);
   max7219_PrintDigit(DIGIT_1, LETTER_E, false);
@@ -161,41 +177,27 @@ int main(void)
   max7219_PrintDigit(16, LETTER_P, false);
   HAL_Delay(1000);
 
-  while(!LTC2986_is_ready(&therms));
-  HAL_UART_Transmit(&huart2, (uint8_t *) "LTC ready", strlen("LTC ready"), 200);
-  uint8_t buffer1 = 0;
-  char buffer[100];
-  LTC2986_global_configure(&therms);
-  // We print the global register:
-    HAL_UART_Transmit(&huart2, (uint8_t *) "global register = ", strlen("global register = "), 200);
-    HAL_Delay(500);
-    sprintf(buffer, "%d\n\r", (int) buffer1);
-    HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 100);
+  /*
+   *
+   * ADD MEMBKEY INIT
+   *
+   */
 
-    //print_status();
-   LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, 10, 8);
-    //print_status();
-  LTC2986_configure_sense_resistor(&therms, 8, 1000);
-    //print_status();
-  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, 1, 10);
-  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, 2, 10);
-    //print_status();
+  HAL_UART_Transmit(&huart2, (uint8_t *) "----- CPU BOARD CONFIGURED -----\n\r", strlen("----- CPU BOARD CONFIGURED -----\n\r"), 100);
 
-  HAL_Delay(1500);
-  HAL_UART_Transmit(&huart2, (uint8_t *) "Holaaa\n\r", strlen("Holaaa\n\r"), 100);
-  lcd_print("Hola\nLabthermics");
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  //float temp = 0;
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
+	  HAL_Delay(1000);
 
+	  // Consider use a for loop to do this
 	  float temp = LTC2986_measure_channel(&therms, 1);
 	  temperatures[0] = (int)(temp * 100);
 	  if(temperatures[0] > 9999) temperatures[0] = 9999;
@@ -217,19 +219,6 @@ int main(void)
 	  for(int i = 3; i < 16; i++) {
 		  temperatures[i] = 3500;
 	  }
-	  //char con[8];
-	  //sprintf(con,"%.4f",temp);
-	  //sprintf(con,"%.4f", temp);
-	  //HAL_UART_Transmit(&huart2, (uint8_t *) &con, strlen(con), 100);
-
-
-	  //float temp_tc = LTC2986_measure_channel(&therms, 1);
-	  //float temp_tc = 20.00;
-	  //char con2[8];
-	  //sprintf(con,"%.4f",temp);
-	  //sprintf(con2,"%.4f",temp_tc);
-	  //HAL_UART_Transmit(&huart2, (uint8_t *) &con2, strlen(con), 100);
-
   }
   /* USER CODE END 3 */
 }
