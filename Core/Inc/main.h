@@ -89,7 +89,7 @@ void Error_Handler(void);
 #define LTM3_CS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-
+#define AVAILABLE_CHANNELS 4
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -59,6 +59,11 @@ float temperature;
 float cold_junction_temperature;
 
 int temperatures[16]={0};
+uint8_t current_channel = 0;
+uint8_t current_chip;
+uint8_t channel_number;
+// Channels: 4 higher bits for the LTM chip and 4 lower bits for the channel.
+uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x05, 0x06, 0x0A};//, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14, 0x15, 0x21, 0x22, 0x23, 0x24, 0x25}; // available: 0x26, 0x36
 
 uint8_t cadena[1] = "0";
 char last_char = '\0'; // To record last character received
@@ -81,7 +86,7 @@ static void MX_I2C3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-LTC2986_t therms = {&hspi2, {LTM3_CS_GPIO_Port, LTM3_CS_Pin}};
+LTC2986_t therms[1] = {{&hspi2, {LTM3_CS_GPIO_Port, LTM3_CS_Pin}}}; // TODO: Include other chips
 
 /* USER CODE END 0 */
 
@@ -122,6 +127,9 @@ int main(void)
   MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
 
+  //DEBUG
+  char buffer[100];
+
   HAL_UART_Receive_IT(&huart2, cadena, 1);
 
   /*
@@ -129,29 +137,31 @@ int main(void)
    * LTM INIT
    *
    */
-  HAL_GPIO_WritePin(therms.cs_pin.gpio_port, therms.cs_pin.gpio_pin, GPIO_PIN_SET);
-  HAL_Delay(400); // Delay for LTM init
-  HAL_UART_Transmit(&huart2, (uint8_t *) "LTM initializing\n\r", strlen("LTM initializing\n\r"), 200);
-  while(!LTC2986_is_ready(&therms));
-  HAL_UART_Transmit(&huart2, (uint8_t *) "Config:\n\n\r", strlen("Config:\n\n\r"), 200);
-  LTC2986_global_configure(&therms);
-  HAL_UART_Transmit(&huart2, (uint8_t *) "General configuration OK\n\r", strlen("General configuration OK\n\r"), 200);
-  LTC2986_configure_rtd(&therms, LTC2986_RTD_PT_100, 10, 8);
-  HAL_UART_Transmit(&huart2, (uint8_t *) "PT100 config OK\n\r", strlen("PT100 config OK\n\r"), 200);
-  LTC2986_configure_sense_resistor(&therms, 8, 1000);
-  HAL_UART_Transmit(&huart2, (uint8_t *) "Sense R config OK\n\r", strlen("Sense R config OK\n\r"), 200);
-  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, 1, 10);
-  HAL_UART_Transmit(&huart2, (uint8_t *) "CH10 Thermocouple Config OK\n\r", strlen("CH10 Thermocouple Config OK\n\r"), 200);
-  LTC2986_configure_thermocouple(&therms, LTC2986_TYPE_T_THERMOCOUPLE, 2, 10);
-  HAL_UART_Transmit(&huart2, (uint8_t *) "CH2 Thermocouple Config OK\n\r", strlen("CH2 Thermocouple Config OK\n\r"), 200);
+  for(current_chip = 0; current_chip < 1; current_chip++) { // TODO: < 3
+	  HAL_GPIO_WritePin(therms[current_chip].cs_pin.gpio_port, therms[current_chip].cs_pin.gpio_pin, GPIO_PIN_SET);
+	  HAL_Delay(400); // Delay for LTM init
+	  HAL_UART_Transmit(&huart2, (uint8_t *) "LTM initializing\n\r", strlen("LTM initializing\n\r"), 200);
+	  while(!LTC2986_is_ready(therms + current_chip));
+	  HAL_UART_Transmit(&huart2, (uint8_t *) "Config:\n\n\r", strlen("Config:\n\n\r"), 200);
+	  LTC2986_global_configure(therms + current_chip);
+	  HAL_UART_Transmit(&huart2, (uint8_t *) "General configuration OK\n\r", strlen("General configuration OK\n\r"), 200);
+	  LTC2986_configure_rtd(therms + current_chip, LTC2986_RTD_PT_100, 10, 8);
+	  HAL_UART_Transmit(&huart2, (uint8_t *) "PT100 config OK\n\r", strlen("PT100 config OK\n\r"), 200);
+	  LTC2986_configure_sense_resistor(therms + current_chip, 8, 1000);
+	  HAL_UART_Transmit(&huart2, (uint8_t *) "Sense R config OK\n\r", strlen("Sense R config OK\n\r"), 200);
+	  for(int i = 1; i < 7; i++) {
+		  LTC2986_configure_thermocouple(therms + current_chip, LTC2986_TYPE_T_THERMOCOUPLE, i, 10);
+		  sprintf(buffer, "CH%d Thermocouple config OK\n\r", i);
+		  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+	  }
+  }
+
 
   /*
    *
    * LCD INIT
    *
    */
-  lcd_init();
-  lcd_init();
   lcd_init();
   HAL_Delay(1500);
   lcd_print("Hola\nLabthermics");
@@ -185,41 +195,38 @@ int main(void)
 
   HAL_UART_Transmit(&huart2, (uint8_t *) "----- CPU BOARD CONFIGURED -----\n\r", strlen("----- CPU BOARD CONFIGURED -----\n\r"), 100);
 
+  for(int i = 0; i < 16; i++) {
+  		  temperatures[i] = 3500;
+  	  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
   while (1)
   {
-    /* USER CODE END WHILE */
+	  /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+	  /* USER CODE BEGIN 3 */
 
-	  HAL_Delay(1000);
+	  if(1) { // state == normal
+		  uint8_t current_chip = (channels[current_channel] & 0xF0) >> 4;
+		  uint8_t channel_number = (channels[current_channel] & 0x0F);
 
-	  // Consider use a for loop to do this
-	  float temp = LTC2986_measure_channel(&therms, 1);
-	  temperatures[0] = (int)(temp * 100);
-	  if(temperatures[0] > 9999) temperatures[0] = 9999;
-	  else if(temperatures[0] < 1000) temperatures[0] = 1000;
-	  max7219_PrintFtos(13, temperatures[0]/100.0, 2);
+		  // Consider use a for loop to do this
+		  float temp = LTC2986_measure_channel(therms + current_chip, channel_number);
+		  temperatures[current_channel] = (int)(temp * 100);
+		  if(temperatures[current_channel] > 9999) temperatures[current_channel] = 9999;
+		  else if(temperatures[current_channel] < 1000) temperatures[current_channel] = 1000;
+		  max7219_PrintFtos(current_channel * 4 + 1, temperatures[current_channel]/100.0, 2);
 
-	  temp = LTC2986_measure_channel(&therms, 2);
-	  temperatures[1] = (int)(temp * 100);
-	  if(temperatures[1] > 9999) temperatures[1] = 9999;
-	  else if(temperatures[1] < 1000) temperatures[1] = 1000;
-	  max7219_PrintFtos(9, temperatures[1]/100.0, 2);
-
-	  temp = LTC2986_measure_channel(&therms, 10);
-	  temperatures[2] = (int)(temp * 100);
-	  if(temperatures[2] > 9999) temperatures[2] = 9999;
-	  else if(temperatures[2] < 1000) temperatures[2] = 1000;
-	  max7219_PrintFtos(5, temperatures[2]/100.0, 2);
-
-	  for(int i = 3; i < 16; i++) {
-		  temperatures[i] = 3500;
-	  }
+		  for(int i = 4; i < 16; i++) {
+			  temperatures[i] = 3500;
+		  }
+		  current_channel = (current_channel + 1) % AVAILABLE_CHANNELS;
+  	}
   }
+
   /* USER CODE END 3 */
 }
 
@@ -548,63 +555,62 @@ void T_temperature_handler_V2(){
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-
   /* Prevent unused argument(s) compilation warning */
   if(huart->Instance == USART2)
   {
+	  if(--chars_to_expect != 0) {
+	  	  switch(cadena[0]){
+	  		case 'I':
+	  		  if(char_counter(cadena[0])){
+	  			done();
+	  		  }
+	  		  break;
+	  		case 'N':
+	  		  if(char_counter(cadena[0])){
+	  			//HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
+	  			N_name_and_status_handler();
+	  		  }
+	  		  break;
+	  		case 'T':
+	  		  if(char_counter(cadena[0])){
+	  			 T_temperature_handler_V2();
+	  		  }
+	  		  break;
+	  		case 'V':
+	  		  if(char_counter(cadena[0])){
+	  			chars_to_expect = 3;
+	  		  }
+	  		  break;
+	  		case 'G':
+	  		  if(char_counter(cadena[0])){
+	  			chars_to_expect = 3;
+	  		  }
+	  		  break;
+	  		case 'E':
+	  		  if(char_counter(cadena[0])){
+	  			chars_to_expect = 18;
+	  		  }
+	  		  break;
+	  		case 'F':
+	  		  if(char_counter(cadena[0])){
+	  			chars_to_expect = 3;
+	  		  }
+	  		  break;
+	  		case 'R':
+	  		  if(char_counter(cadena[0])){
+	  			T_temperature_handler_V2();
+	  		  }
+	  		  break;
 
-    if(--chars_to_expect != 0) {
-      switch(cadena[0]){
-        case 'I':
-          if(char_counter(cadena[0])){
-            done();
-          }
-          break;
-        case 'N':
-          if(char_counter(cadena[0])){
-            //HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
-            N_name_and_status_handler();
-          }
-          break;
-        case 'T':
-          if(char_counter(cadena[0])){
-             T_temperature_handler_V2();
-          }
-          break;
-        case 'V':
-          if(char_counter(cadena[0])){
-            chars_to_expect = 3;
-          }
-          break;
-        case 'G':
-          if(char_counter(cadena[0])){
-            chars_to_expect = 3;
-          }
-          break;
-        case 'E':
-          if(char_counter(cadena[0])){
-            chars_to_expect = 18;
-          }
-          break;
-        case 'F':
-          if(char_counter(cadena[0])){
-            chars_to_expect = 3;
-          }
-          break;
-        case 'R':
-          if(char_counter(cadena[0])){
-            T_temperature_handler_V2();
-          }
-          break;
-
-        default:
-          //HAL_UART_Transmit(&huart2, (uint8_t *)"Comando no reconocido\n", strlen("Comando no reconocido\n"), 100); // acá se debe poner una función tipo "No_recognized_command_handler"
-          break;
-      }
-    } else {
-      done();
-    }
-    HAL_UART_Receive_IT(&huart2, cadena, 1);
+	  		default:
+	  		  //HAL_UART_Transmit(&huart2, (uint8_t *)"Comando no reconocido\n", strlen("Comando no reconocido\n"), 100); // acá se debe poner una función tipo "No_recognized_command_handler"
+	  		  break;
+	  	  }
+	  	} else {
+	  	  done();
+	  	}
+	      cadena[0] = 0;
+	  	HAL_UART_Receive_IT(&huart2, cadena, 1);
   }
 }
 
