@@ -65,12 +65,16 @@ void Error_Handler(void);
 #define SPI_CS3_GPIO_Port GPIOC
 #define keypadRow1_Pin GPIO_PIN_12
 #define keypadRow1_GPIO_Port GPIOB
+#define keypadRow1_EXTI_IRQn EXTI15_10_IRQn
 #define keypadRow2_Pin GPIO_PIN_13
 #define keypadRow2_GPIO_Port GPIOB
+#define keypadRow2_EXTI_IRQn EXTI15_10_IRQn
 #define keypadRow3_Pin GPIO_PIN_14
 #define keypadRow3_GPIO_Port GPIOB
+#define keypadRow3_EXTI_IRQn EXTI15_10_IRQn
 #define keypadRow4_Pin GPIO_PIN_15
 #define keypadRow4_GPIO_Port GPIOB
+#define keypadRow4_EXTI_IRQn EXTI15_10_IRQn
 #define keypadColumn1_Pin GPIO_PIN_9
 #define keypadColumn1_GPIO_Port GPIOA
 #define keypadColumn2_Pin GPIO_PIN_10
@@ -89,7 +93,40 @@ void Error_Handler(void);
 #define LTM3_CS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+// LTM setting
 #define AVAILABLE_CHANNELS 4
+
+// Calibration states
+typedef enum {
+	NORMAL_STATE = 0x00,
+    CALIBRATE_ALL_PROBES_STATE = 0x01,
+    CONFIRM_DETECTED_STATE = 0x02,
+    SHOULD_PROBE_STATE = 0x03,
+    CONFIRM_PROBES_STATE = 0x04,
+    ONE_OR_TWO_STATE = 0x05,
+    PLACE_ONLY_POINT_STATE = 0x06,
+    INPUT_ONLY_TEMPERATURE_STATE = 0x07,
+    PLACE_FIRST_POINT_STATE = 0x08,
+    INPUT_FIRST_TEMPERATURE_STATE = 0x09,
+    PLACE_SECOND_POINT_STATE = 0x0A,
+    INPUT_SECOND_TEMPERATURE_STATE = 0x0B,
+    CALIBRATION_COMPLETE_STATE = 0x0C
+} calibration_state_t;
+
+void update_temperatures();
+void calibrate_all_probes_handler();
+void confirm_detected_handler();
+void should_probe_handler();
+void confirm_probes_handler();
+void one_or_two_handler();
+void place_only_point_handler();
+void input_only_temperature_handler();
+void place_first_point_handler();
+void input_first_temperature_handler();
+void place_second_point_handler();
+void input_second_temperature_handler();
+void calibration_complete_handler();
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
