@@ -74,6 +74,8 @@ int chars_to_expect = -1; // Counter for the digits that should be sent from the
 
 calibration_state_t CURRENT_STATE = NORMAL_STATE;
 uint16_t button_pressed = KEYPAD_ERROR_KEY;
+uint16_t check_key = KEYPAD_ERROR_KEY;
+uint16_t aux_key = KEYPAD_ERROR_KEY;
 
 /* USER CODE END PV */
 
@@ -216,6 +218,26 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+	  aux_key = check_key;
+	  if(aux_key != KEYPAD_ERROR_KEY) {
+
+		  HAL_Delay(100);
+
+		  sprintf(buffer, "checking: %d\n\r", check_key);
+		  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		  uint16_t temp = getPressedKey();
+		  if(aux_key == temp) {
+			  button_pressed = aux_key;
+
+			  sprintf(buffer, "checked: %d!\n\r", button_pressed);
+			  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		  } else {
+			  sprintf(buffer, "differs: %d!\n\r", temp);
+			  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		  }
+		  check_key = KEYPAD_ERROR_KEY;
+		  aux_key = check_key;
+	  }
 	  switch(CURRENT_STATE) {
 	  case NORMAL_STATE:
 		  update_temperatures();
@@ -263,7 +285,7 @@ int main(void)
 	  if(button_pressed != KEYPAD_ERROR_KEY) {
 		  sprintf(buffer, "key: %d pressed\n\r", button_pressed);
 	  	  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
-	  	  //button_pressed = KEYPAD_ERROR_KEY;
+	  	  button_pressed = KEYPAD_ERROR_KEY;
 	  }
   }
 
@@ -534,12 +556,12 @@ static void MX_GPIO_Init(void)
 
 void update_temperatures()
 {
-  if(button_pressed == KEYPAD_CALIB_KEY) {
+  /*if(button_pressed == KEYPAD_CALIB_KEY) {
 	  HAL_UART_Transmit(&huart2, (uint8_t *) "Init calib.\n\r", strlen("Init calib.\n\r"), 300);
 	  CURRENT_STATE = CALIBRATE_ALL_PROBES_STATE;
 	  button_pressed = KEYPAD_ERROR_KEY;
 	  return;
-  }
+  }*/
 
   uint8_t current_chip = (channels[current_channel] & 0xF0) >> 4;
   uint8_t channel_number = (channels[current_channel] & 0x0F);
@@ -818,7 +840,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     return;
   }
   HAL_UART_Transmit(&huart2, (uint8_t *) "ExtI\n\r", strlen("ExtI\n\r"), 200);
-  button_pressed = key;
+  check_key = key;
+  //char buffer[100];
+  //sprintf(buffer, "key: %d \n\r", current_chip);
+  //HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
 
 }
 

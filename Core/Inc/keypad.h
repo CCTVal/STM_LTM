@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-#define KEYPAD_ERROR_KEY	0x00FF
+#define KEYPAD_ERROR_KEY	0xFFFF
 #define KEYPAD_CALIB_KEY	0x0005
 #define KEYPAD_EXIT_KEY		0x000D
 #define KEYPAD_YES_KEY		0x000B
@@ -18,6 +18,7 @@
 
 void keypad_Init();
 uint16_t getKeyAsInt(uint16_t GPIO_Pin);
+uint16_t getPressedKey();
 char getKeyAsChar(uint16_t GPIO_Pin);
 
 #endif /* KEYPAD_H_ */
