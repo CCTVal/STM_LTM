@@ -12,7 +12,7 @@
 #include "stdbool.h"
 
 #define NUMBER_OF_DIGITS	8
-#define NUMBER_OF_CHIPS		2
+#define NUMBER_OF_CHIPS		8
 #define SPI_PORT			hspi3
 
 extern SPI_HandleTypeDef 	SPI_PORT;

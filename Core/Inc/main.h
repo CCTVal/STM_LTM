@@ -94,7 +94,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 // LTM setting
-#define AVAILABLE_CHANNELS 4
+#define AVAILABLE_CHANNELS 16
 
 // Calibration states
 typedef enum {
@@ -112,6 +112,14 @@ typedef enum {
     INPUT_SECOND_TEMPERATURE_STATE = 0x0B,
     CALIBRATION_COMPLETE_STATE = 0x0C
 } calibration_state_t;
+
+typedef enum {
+	FACTORY_CALIBRATED = 0x01,
+	PREVIOUSLY_CALIBRATED = 0x02,
+	JUST_CALIBRATED = 0x04,
+    ONE_POINT_CALIBRATED = 0x10,
+    TWO_POINT_CALIBRATED = 0x20,
+} calibrated_t;
 
 void update_temperatures();
 void calibrate_all_probes_handler();

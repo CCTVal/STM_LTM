@@ -205,7 +205,10 @@ float LTC2986_measure_channel(LTC2986_t *LTM, uint8_t channel_number) {
 	read_RAM(LTM, address, 4, temp);
 	uint8_t fault = temp[0];
 	if(fault != LTC2986_VALID) {
-		return(0xFFFFFF00 & fault); // Return a NaN with the fault encoded
+		uint8_t return_value[4] = {0xFF, 0xFF, 0xFF, fault};
+		float *casted_return_value;
+		casted_return_value = (float*) return_value;
+		return(*casted_return_value); // Return a NaN with the fault encoded
 	}
 	uint32_t raw_result = (((uint32_t) temp[3]) | ((uint32_t) temp[2] << 8) | ((uint32_t) temp[1] << 16)) & 0x00FFFFFF;
 	float result = ((float) raw_result) / 1024; // Assuming it is a temperature channel (not voltage, for example)
