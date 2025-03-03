@@ -24,8 +24,8 @@ static uint8_t SYMBOLS[] = {
 		0x7F,	// numeric 8
 		0x7B,	// numeric 9
 		0x01,	// minus
-		0x4F,	// letter E
-		0x37,	// letter H
+		0x4E,	// letter C
+		0x77,	// letter A
 		0x0E,	// letter L
 		0x67,	// letter P
 		0x00	// blank
