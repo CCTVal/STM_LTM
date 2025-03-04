@@ -54,11 +54,12 @@ typedef enum {
 	MINUS		= 0x0A,
 	LETTER_E	= 0x0B,
 	LETTER_H	= 0x0C,
-	LETTER_C	= 0x0B,
-	LETTER_A	= 0x0C,
 	LETTER_L	= 0x0D,
 	LETTER_P	= 0x0E,
-	BLANK		= 0x0F
+	BLANK		= 0x0F,
+	LETTER_A	= 0x10,
+	LETTER_B	= 0x11,
+	LETTER_C	= 0x12
 }MAX7219_Numeric;
 
 void max7219_Init(uint8_t intensivity);

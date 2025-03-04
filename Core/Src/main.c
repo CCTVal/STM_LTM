@@ -65,7 +65,11 @@ uint8_t current_channel = 0;
 uint8_t current_chip;
 uint8_t channel_number;
 // Channels: 4 higher bits for the LTM chip and 4 lower bits for the channel.
-uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x0A, 0x0A, 0x0A, 0x0A};
+//uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x0A, 0x0A, 0x0A, 0x0A};
+//uint8_t channels[AVAILABLE_CHANNELS] = {0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x1A, 0x1A, 0x1A, 0x1A};
+//uint8_t channels[AVAILABLE_CHANNELS] = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x2A, 0x2A, 0x2A, 0x2A};
+//uint8_t channels[AVAILABLE_CHANNELS] = {0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x1A, 0x1A, 0x2A, 0x2A};
+uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x0A, 0x0A, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x1A, 0x1A};
 
 uint8_t cadena[1] = "0";
 char last_char = '\0'; // To record last character received
@@ -93,7 +97,7 @@ float calibration_reference[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 int digit_counter = 0;
 float nominal_temperature = 0;
 
-char static_message[50] = "Hola Labthermics\n                CAL.    ";
+char static_message[50] = "      Labthermics       \n                CAL.    ";
 
 char buffer[100] = {0};
 char lcd_buffer[100] = {0};
@@ -114,7 +118,7 @@ static void MX_I2C3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-LTC2986_t therms[3] = {{&hspi2, {LTM3_CS_GPIO_Port, LTM3_CS_Pin}}, {&hspi2, {LTM2_CS_GPIO_Port, LTM2_CS_Pin}}, {&hspi2, {LTM1_CS_GPIO_Port, LTM1_CS_Pin}}};
+LTC2986_t therms[3] = {{&hspi2, {LTM1_CS_GPIO_Port, LTM1_CS_Pin}}, {&hspi2, {LTM2_CS_GPIO_Port, LTM2_CS_Pin}}, {&hspi2, {LTM3_CS_GPIO_Port, LTM3_CS_Pin}}};
 
 /* USER CODE END 0 */
 
@@ -165,7 +169,7 @@ int main(void)
   for(current_chip = 0; current_chip < 3; current_chip++) {
 	  HAL_GPIO_WritePin(therms[current_chip].cs_pin.gpio_port, therms[current_chip].cs_pin.gpio_pin, GPIO_PIN_SET);
   }
-  for(current_chip = 0; current_chip < 1; current_chip++) { // TODO: < 3
+  for(current_chip = 0; current_chip < 2; current_chip++) { // TODO: < 3
 	  HAL_Delay(400); // Delay for LTM init
 	  sprintf(buffer, "LTM%d initializing\n\r", current_chip);
 	  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
@@ -199,7 +203,7 @@ int main(void)
    *
    */
   max7219_Init(3);
-  max7219_Decode_On();
+  max7219_Decode_Off();
   HAL_Delay(4000); //Explain this Delay
   max7219_Clean();
   max7219_PrintFtos(DIGIT_1, -3.14, 2);
@@ -232,7 +236,7 @@ int main(void)
 	  memory_ready = false;
 	  HAL_UART_Transmit(&huart2, (uint8_t *) "Memory init. error\n\r", strlen("Memory init. error\n\r"), 300);
   }
-
+/*
   if(ee_read(last_calibration_address, 1, last_calibration)) {
 	  HAL_UART_Transmit(&huart2, (uint8_t *) "Calibration status read\n\r", strlen("Calibration status read\n\r"), 300);
 	  *last_calibration = (*last_calibration) & (~JUST_CALIBRATED);
@@ -253,7 +257,7 @@ int main(void)
 	  sprintf(buffer, "Slope 1: %f \n\r", calibration_slope[1]);
 	  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
   }
-
+*/
 
   HAL_UART_Transmit(&huart2, (uint8_t *) "----- CPU BOARD CONFIGURED -----\n\r", strlen("----- CPU BOARD CONFIGURED -----\n\r"), 300);
 
@@ -314,12 +318,12 @@ int main(void)
 	  default:
 		  break;
   	  }
-
+/*
 	  if(button_pressed != KEYPAD_ERROR_KEY) {
 		  sprintf(buffer, "key: %d pressed\n\r", button_pressed);
 	  	  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
-	  	  //button_pressed = KEYPAD_ERROR_KEY;
 	  }
+	  */
   }
 
   /* USER CODE END 3 */
@@ -591,7 +595,7 @@ void update_temperatures()
 {
   if(button_pressed == KEYPAD_CALIB_KEY) {
 	  HAL_UART_Transmit(&huart2, (uint8_t *) "Init calib.\n\r", strlen("Init calib.\n\r"), 300);
-	  lcd_print("Calibrate all?\n     YES  NO        EXIT");
+	  lcd_print("Calibrate all probes?\n     YES  NO        EXIT");
 	  CURRENT_STATE = CALIBRATE_ALL_PROBES_STATE;
 	  button_pressed = KEYPAD_ERROR_KEY;
 	  return;
@@ -634,13 +638,13 @@ void calibrate_all_probes_handler()
 	for(uint8_t digit = 1; digit < 1 + AVAILABLE_CHANNELS * 4; digit++) {
 		max7219_PrintDigit(digit, BLANK, true);
 	}
-	HAL_Delay(100);
 	if(button_pressed == KEYPAD_EXIT_KEY) {
 		CURRENT_STATE = NORMAL_STATE;
 		lcd_print(static_message);
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_YES_KEY) {
 		for(int probe_number = 0; probe_number < AVAILABLE_CHANNELS; probe_number++) {
+			/*
 	      uint8_t current_chip = (channels[probe_number] & 0xF0) >> 4;
 		  uint8_t channel_number = (channels[probe_number] & 0x0F);
 		  float temp = LTC2986_measure_channel(&(therms[current_chip]), channel_number);
@@ -648,24 +652,26 @@ void calibrate_all_probes_handler()
 		  measure_result = (uint32_t*) &temp;
 		  if((((*measure_result) & 0xFFFFFF00) == 0xFFFFFF00) // if temp is NaN
 			     || temp > 99 || temp < 10) {
+			     */
+		  if(temperatures[probe_number] == 0) {
 			  probes_to_be_calibrated[probe_number] = false;
-			  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
-			  max7219_PrintDigit(probe_number * 4 + 1, BLANK, true);
-			  max7219_PrintDigit(probe_number * 4 + 2, BLANK, true);
-			  max7219_PrintDigit(probe_number * 4 + 3, BLANK, true);
-			  max7219_PrintDigit(probe_number * 4 + 4, BLANK, true);
+			  max7219_PrintDigit(probe_number * 4 + 1, BLANK, false);
+			  max7219_PrintDigit(probe_number * 4 + 2, BLANK, false);
+			  max7219_PrintDigit(probe_number * 4 + 3, BLANK, false);
+			  max7219_PrintDigit(probe_number * 4 + 4, BLANK, false);
 		  } else {
 			  probes_to_be_calibrated[probe_number] = true;
-              HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
-			  max7219_PrintFtos(probe_number * 4 + 1, temp, 2);
+			  max7219_PrintDigit(probe_number * 4 + 1, LETTER_C, false);
+			  max7219_PrintDigit(probe_number * 4 + 2, LETTER_A, false);
+			  max7219_PrintDigit(probe_number * 4 + 3, LETTER_L, false);
 		  }
 		}
 		CURRENT_STATE = CONFIRM_DETECTED_STATE;
-		lcd_print("Confirm detected\n     OK             EXIT");
+		lcd_print("Probes to be calibrated\n    NEXT            EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_NO_KEY) {
 		CURRENT_STATE = SHOULD_PROBE_STATE;
-		sprintf(lcd_buffer, "Use probe 1?\n     YES  NO        EXIT");
+		lcd_print("Cal probe #1?\n     YES  NO        EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 	}
 }
@@ -677,7 +683,7 @@ void confirm_detected_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_YES_KEY) {
 		CURRENT_STATE = ONE_OR_TWO_STATE;
-		lcd_print("One or two points?\nONE             TWO EXIT");
+		lcd_print("Number of cal points\nONE             TWO EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 	}
 	return;
@@ -692,7 +698,7 @@ void should_probe_handler()
 		return;
 	} else if(probe_number > 15) {
 		CURRENT_STATE = CONFIRM_PROBES_STATE;
-		lcd_print("Confirm probes\n     YES            EXIT");
+		lcd_print("Probes to be calibrated\n     YES            EXIT");
 		probe_number = 0;
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else {
@@ -702,7 +708,7 @@ void should_probe_handler()
 			max7219_PrintDigit(probe_number * 4 + 2, LETTER_A, false);
 			max7219_PrintDigit(probe_number * 4 + 3, LETTER_L, false);
 			probe_number++;
-			sprintf(lcd_buffer, "Use probe %d?\n     YES  NO        EXIT", probe_number + 1);
+			sprintf(lcd_buffer, "Cal probe #%d?\n     YES  NO   NEXT EXIT", probe_number + 1);
 			lcd_print(lcd_buffer);
 			button_pressed = KEYPAD_ERROR_KEY;
 		} else if(button_pressed == KEYPAD_NO_KEY) {
@@ -712,8 +718,18 @@ void should_probe_handler()
 			max7219_PrintDigit(probe_number * 4 + 3, BLANK, false);
 			max7219_PrintDigit(probe_number * 4 + 4, BLANK, false);
 			probe_number++;
-			sprintf(lcd_buffer, "Use probe %d?\n     YES  NO        EXIT", probe_number + 1);
+			sprintf(lcd_buffer, "Cal probe #%d?\n     YES  NO   NEXT EXIT", probe_number + 1);
 			lcd_print(lcd_buffer);
+			button_pressed = KEYPAD_ERROR_KEY;
+		} else if(button_pressed == KEYPAD_D_KEY) {
+			while(probe_number < 16) {
+				probes_to_be_calibrated[probe_number] = false;
+				max7219_PrintDigit(probe_number * 4 + 1, BLANK, false);
+				max7219_PrintDigit(probe_number * 4 + 2, BLANK, false);
+				max7219_PrintDigit(probe_number * 4 + 3, BLANK, false);
+				max7219_PrintDigit(probe_number * 4 + 4, BLANK, false);
+				probe_number++;
+			}
 			button_pressed = KEYPAD_ERROR_KEY;
 		}
 	}
@@ -728,7 +744,7 @@ void confirm_probes_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_YES_KEY) {
 		CURRENT_STATE = ONE_OR_TWO_STATE;
-		lcd_print("One or two points?\nONE             TWO EXIT");
+		lcd_print("Number of cal points\nONE             TWO EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 	}
 	return;
@@ -741,11 +757,11 @@ void one_or_two_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_A_KEY) {
 		CURRENT_STATE = PLACE_ONLY_POINT_STATE;
-		lcd_print("Place only point\n      OK            EXIT");
+		lcd_print("Place probes for cal\n     NEXT           EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_D_KEY) {
 		CURRENT_STATE = PLACE_FIRST_POINT_STATE;
-		lcd_print("place first point\n      OK            EXIT");
+		lcd_print("place probes for cal (1)\n     NEXT           EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 	}
 	return;
@@ -759,7 +775,7 @@ void place_only_point_handler()
 	} else if(button_pressed == KEYPAD_YES_KEY) {
 		CURRENT_STATE = INPUT_ONLY_TEMPERATURE_STATE;
 		button_pressed = KEYPAD_ERROR_KEY;
-		lcd_print("Input only temperature\nDONE                EXIT");
+		lcd_print("Enter cal temp\nENTER               EXIT");
 		digit_counter = 0;
 		nominal_temperature = 0;
 	}
@@ -818,7 +834,7 @@ void place_first_point_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_YES_KEY) {
 		CURRENT_STATE = INPUT_FIRST_TEMPERATURE_STATE;
-		lcd_print("input first temp\nDONE                EXIT");
+		lcd_print("input cal temp (1)\nDONE                EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 		digit_counter = 0;
 		nominal_temperature = 0;
@@ -845,7 +861,7 @@ void input_first_temperature_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_A_KEY) {
 		CURRENT_STATE = PLACE_SECOND_POINT_STATE;
-		lcd_print("place second point\n      OK            EXIT");
+		lcd_print("place probes for cal (2)\n      OK            EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 		digit_counter = 0;
 		for(int current_channel = 0; current_channel < AVAILABLE_CHANNELS; current_channel++) {
@@ -869,7 +885,7 @@ void place_second_point_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_YES_KEY) {
 		CURRENT_STATE = INPUT_SECOND_TEMPERATURE_STATE;
-		lcd_print("input second temp\nDONE                EXIT");
+		lcd_print("input cal temp (2)\nDONE                EXIT");
 		button_pressed = KEYPAD_ERROR_KEY;
 		digit_counter = 0;
 		nominal_temperature = 0;
@@ -898,11 +914,13 @@ void input_second_temperature_handler()
 		CURRENT_STATE = CALIBRATION_COMPLETE_STATE;
 		button_pressed = KEYPAD_ERROR_KEY;
 		digit_counter = 0;
-		if(nominal_temperature - calibration_first_point) {
+		if(!(nominal_temperature - calibration_first_point)) {
 			lcd_print("Second temperature can\nnot be same as first");
+			HAL_Delay(5000);
 			CURRENT_STATE = NORMAL_STATE;
 			lcd_print(static_message);
 			button_pressed = KEYPAD_ERROR_KEY;
+			return;
 		}
 		for(int current_channel = 0; current_channel < AVAILABLE_CHANNELS; current_channel++) {
 			if(probes_to_be_calibrated[current_channel]) {
@@ -926,7 +944,7 @@ void input_second_temperature_handler()
 }
 void calibration_complete_handler()
 {
-	lcd_print("Calibration complete!\nCongratulations!");
+	lcd_print("System calibrated\nCongratulations!");
 	HAL_Delay(5000);
 	lcd_print("Thermometry Unit\n               CAL.     ");
 	CURRENT_STATE = NORMAL_STATE;
@@ -1067,7 +1085,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   if(key == KEYPAD_ERROR_KEY) {
     return;
   }
-  HAL_UART_Transmit(&huart2, (uint8_t *) "ExtI\n\r", strlen("ExtI\n\r"), 200);
+  //HAL_UART_Transmit(&huart2, (uint8_t *) "ExtI\n\r", strlen("ExtI\n\r"), 200);
   button_pressed = key;
 
 }

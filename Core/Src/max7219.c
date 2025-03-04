@@ -24,11 +24,14 @@ static uint8_t SYMBOLS[] = {
 		0x7F,	// numeric 8
 		0x7B,	// numeric 9
 		0x01,	// minus
-		0x4E,	// letter C
-		0x77,	// letter A
+		0x4F,	// letter E
+		0x37,	// letter A
 		0x0E,	// letter L
 		0x67,	// letter P
-		0x00	// blank
+		0x00,	// blank
+		0x77,	// letter A
+		0x78,	// letter B
+		0x4E	// letter C
 };
 
 static uint16_t getSymbol(uint8_t number);
@@ -79,29 +82,7 @@ void max7219_SendData(uint8_t addr, uint8_t data, uint8_t chip)
 {
 	CS_SET();
 	uint8_t no_op_address = REG_NO_OP;
-	/*
-#if NUMBER_OF_CHIPS == 2
-	if(chip == 1) {
-		HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
-		HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
-		//HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
-		//HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
-		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
-		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
-	} else {
-		//HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
-		//HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
-		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
-		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
-		HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
-		HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
-	}
-#endif
-#if NUMBER_OF_CHIPS == 1
-	HAL_SPI_Transmit(&hspi3, &addr, 1, HAL_MAX_DELAY);
-	HAL_SPI_Transmit(&hspi3, &data, 1, HAL_MAX_DELAY);
-#endif
-	*/
+
 	for(int i = 0; i < NUMBER_OF_CHIPS - chip; i++) {
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
@@ -112,7 +93,6 @@ void max7219_SendData(uint8_t addr, uint8_t data, uint8_t chip)
 	for(int i = 1; i < chip; i++) {
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
 		HAL_SPI_Transmit(&hspi3, &no_op_address, 1, HAL_MAX_DELAY);
-		//HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin); // No uses toggle, enciendelo no mas
 	}
 
 	CS_RESET();
@@ -190,7 +170,8 @@ MAX7219_Digits max7219_PrintItos(MAX7219_Digits position, int value)
 {
 	int chip = (position - 1) / NUMBER_OF_DIGITS + 1;
 	position = (position - 1) % NUMBER_OF_DIGITS + 1;
-	max7219_SendData(REG_DECODE_MODE, 0xFF, chip);
+	//max7219_SendData(REG_DECODE_MODE, 0xFF, chip);
+	//HAL_Delay(4000);
 
 	int32_t i;
 
@@ -198,7 +179,7 @@ MAX7219_Digits max7219_PrintItos(MAX7219_Digits position, int value)
 	{
 		if(position > 0)
 		{
-			max7219_SendData(position, MINUS, chip);
+			max7219_SendData(position, decodeMode ? MINUS : getSymbol(MINUS), chip);
 			position++;
 		}
 		value = -value;
@@ -213,7 +194,7 @@ MAX7219_Digits max7219_PrintItos(MAX7219_Digits position, int value)
 
 	if(position > 0)
 	{
-		max7219_SendData(position, value/i, chip);
+		max7219_SendData(position, decodeMode ? value/i : getSymbol(value/i), chip);
 		position++;
 	}
 
@@ -223,14 +204,14 @@ MAX7219_Digits max7219_PrintItos(MAX7219_Digits position, int value)
 	{
 		if(position > 0)
 		{
-			max7219_SendData(position, (value % (i * 10)) / i, chip);
+			max7219_SendData(position, decodeMode ? (value % (i * 10)) / i : getSymbol((value % (i * 10)) / i), chip);
 			position++;
 		}
 
 		i /= 10;
 	}
 
-	max7219_SendData(REG_DECODE_MODE, decodeMode, chip);
+	//max7219_SendData(REG_DECODE_MODE, decodeMode, chip);
 
 	return position;
 }
@@ -239,7 +220,8 @@ MAX7219_Digits max7219_PrintNtos(MAX7219_Digits position, uint32_t value, uint8_
 {
 	int chip = (position - 1) / NUMBER_OF_DIGITS + 1;
 	position = (position - 1) % NUMBER_OF_DIGITS + 1;
-	max7219_SendData(REG_DECODE_MODE, 0xFF, chip);
+	//max7219_SendData(REG_DECODE_MODE, 0xFF, chip);
+	//HAL_Delay(4000);
 
 	if (n > 0u)
 	{
@@ -249,7 +231,7 @@ MAX7219_Digits max7219_PrintNtos(MAX7219_Digits position, uint32_t value, uint8_
 		{
 			if(position > 0u)
 			{
-				max7219_SendData(position, (value / i) % 10u, chip);
+				max7219_SendData(position, decodeMode ? (value / i) % 10u : getSymbol((value / i) % 10u), chip);
 				position++;
 			}
 
@@ -257,7 +239,7 @@ MAX7219_Digits max7219_PrintNtos(MAX7219_Digits position, uint32_t value, uint8_
 		}
 	}
 
-	max7219_SendData(REG_DECODE_MODE, decodeMode, chip);
+	//max7219_SendData(REG_DECODE_MODE, decodeMode, chip);
 
 	return position;
 }
@@ -271,13 +253,13 @@ MAX7219_Digits max7219_PrintFtos(MAX7219_Digits position, float value, uint8_t n
 
 	int chip = (position - 1) / NUMBER_OF_DIGITS + 1;
 	position = (position - 1) % NUMBER_OF_DIGITS + 1;
-	max7219_SendData(REG_DECODE_MODE, 0xFF, chip);
+	//max7219_SendData(REG_DECODE_MODE, 0xFF, chip);
 
 	if (value < 0.0)
 	{
 		if(position > 0)
 		{
-			max7219_SendData(position, MINUS, chip);
+			max7219_SendData(position, decodeMode ? MINUS : getSymbol(MINUS), chip);
 			position++;
 		}
 
@@ -293,7 +275,7 @@ MAX7219_Digits max7219_PrintFtos(MAX7219_Digits position, float value, uint8_t n
 		position = max7219_PrintNtos(position + ((chip - 1) * NUMBER_OF_DIGITS), (uint32_t) (value * (float) lcdPow10(n)), n);
 	}
 
-	max7219_SendData(REG_DECODE_MODE, decodeMode, chip);
+	//max7219_SendData(REG_DECODE_MODE, decodeMode, chip);
 
 	return position;
 }
