@@ -37,7 +37,6 @@ typedef enum {
 typedef enum {
 	DIGIT_1 = 1, DIGIT_2 = 2, DIGIT_3 = 3, DIGIT_4 = 4,
 	DIGIT_5 = 5, DIGIT_6 = 6, DIGIT_7 = 7, DIGIT_8 = 8
-
 } MAX7219_Digits;
 
 typedef enum {
@@ -60,7 +59,7 @@ typedef enum {
 	LETTER_A	= 0x10,
 	LETTER_B	= 0x11,
 	LETTER_C	= 0x12
-}MAX7219_Numeric;
+} MAX7219_Numeric;
 
 void max7219_Init(uint8_t intensivity);
 void max7219_SetIntensivity(uint8_t intensivity);

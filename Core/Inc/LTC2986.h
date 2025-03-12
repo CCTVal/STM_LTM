@@ -57,7 +57,7 @@ typedef enum {
 } LTC2986_sensor_t;
 
 typedef struct {
-    GPIO_TypeDef *gpio_port;
+	GPIO_TypeDef *gpio_port;
     uint16_t gpio_pin;
 } LTC2986_gpio_t;
 
@@ -72,6 +72,8 @@ void LTC2986_configure_rtd(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channe
 void LTC2986_configure_sense_resistor(LTC2986_t *LTM, uint8_t channel_number, float resistance);
 void LTC2986_configure_thermocouple(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channel_number, uint8_t cold_juntion_channel);
 float LTC2986_measure_channel(LTC2986_t *LTM, uint8_t channel_number);
+void LTC2986_init_measurement(LTC2986_t *LTM, uint8_t channel_number);
+float LTC2986_fetch_measurement(LTC2986_t *LTM, uint8_t channel_number);
 uint8_t LTC2986_is_ready(LTC2986_t *LTM);
 uint8_t LTC2986_read_status(LTC2986_t *LTM);
 

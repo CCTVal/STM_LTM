@@ -1,6 +1,3 @@
-
-/** Put this in the src folder **/
-
 #include "i2c_lcd.h"
 extern I2C_HandleTypeDef hi2c3;  // change your handler here accordingly
 
@@ -8,7 +5,7 @@ extern I2C_HandleTypeDef hi2c3;  // change your handler here accordingly
 
 void lcd_send_cmd (char cmd)
 {
-  char data_u, data_l;
+	char data_u, data_l;
 	uint8_t data_t[4];
 	data_u = (cmd&0xf0);
 	data_l = ((cmd<<4)&0xf0);
@@ -35,25 +32,22 @@ void lcd_send_data (char data)
 void lcd_clear (void)
 {
 	lcd_send_cmd (0x80);
-	for (int i=0; i<70; i++)
-	{
+	for (int i=0; i<70; i++) {
 		lcd_send_data (' ');
 	}
 }
 
 void lcd_put_cur(int row, int col)
 {
-    switch (row)
-    {
-        case 0:
-            col |= 0x80;
-            break;
-        case 1:
-            col |= 0xC0;
-            break;
-    }
-
-    lcd_send_cmd (col);
+	switch (row) {
+	case 0:
+		col |= 0x80;
+		break;
+	case 1:
+		col |= 0xC0;
+		break;
+	}
+	lcd_send_cmd (col);
 }
 
 

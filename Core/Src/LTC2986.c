@@ -33,7 +33,8 @@
   * @param  32-bit datuum
   * @param  8-bit data array. It is assummed to have size >= 4.
   */
-void int32_to_int8_array(int32_t int32_value, uint8_t *int8_array) {
+void int32_to_int8_array(int32_t int32_value, uint8_t *int8_array)
+{
     // Using pointer arithmetic to access each byte of the 32-bit integer
     *(int8_array + 3) = (uint8_t)(int32_value & 0xFF);        // Most significant byte (LSB)
     *(int8_array + 2) = (uint8_t)((int32_value >> 8) & 0xFF);
@@ -50,7 +51,8 @@ void int32_to_int8_array(int32_t int32_value, uint8_t *int8_array) {
   * @param  length Register size in bytes. Typically it's 1, or 4
   * @param  buffer Pointer to where the data will be returned.
   */
-void read_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer) {
+void read_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer)
+{
 	uint8_t read_instruction = READ_FROM_RAM;
 	uint8_t address_8bit[2];
 	address_8bit[1] = (uint8_t) (address) & 0xFF;
@@ -71,7 +73,8 @@ void read_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer) {
   * @param  length data length in bytes to be sent. Should be equal to register size in bytes. Typically it's 1, or 4.
   * @param  buffer Pointer to the data that will be sent.
   */
-void write_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer) {
+void write_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer)
+{
 	uint8_t write_instruction = WRITE_TO_RAM;
 	uint8_t address_8bit[2];
 	address_8bit[1] = (uint8_t) (address) & 0xFF;
@@ -90,8 +93,9 @@ void write_RAM(LTC2986_t *LTM, uint16_t address, int length, uint8_t *buffer) {
   * @param  LTM pointer to a LTC2986 structure that contains
   *               the configuration information for SPI module.
   */
-void LTC2986_global_configure(LTC2986_t *LTM) {
-	uint8_t config = LTC2986_CELSIUS | LTC2986_FILTER_55_HZ; // no excitation mode
+void LTC2986_global_configure(LTC2986_t *LTM)
+{
+	uint8_t config = LTC2986_CELSIUS | LTC2986_FILTER_50_HZ; // no excitation mode
 	write_RAM(LTM, LTC2986_GLOBAL_CONFIGURATION_REGISTER, 1, &config);
 	uint8_t extra_delay = 0; // Add 1 per each micro-second desired. Zero equals 1 millisecond for configuration setting.
 	write_RAM(LTM, LTC2986_DELAY_REGISTER, 1, &extra_delay);
@@ -107,7 +111,8 @@ void LTC2986_global_configure(LTC2986_t *LTM) {
   * @param  channel_number To which channel the RTD is to be connected
   * @param  sense_channel Associated sense resistor channel.
   */
-void LTC2986_configure_rtd(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channel_number, uint8_t sense_channel) {
+void LTC2986_configure_rtd(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channel_number, uint8_t sense_channel)
+{
 	uint32_t configuration;
 	configuration = type << 27;
 	configuration |= (sense_channel) << 22;
@@ -129,7 +134,8 @@ void LTC2986_configure_rtd(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channe
   * @param  channel_number To which channel the thermocouple is to be connected
   * @param  cold_junction_channel Associated cold junction temperature sensor channel.
   */
-void LTC2986_configure_thermocouple(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channel_number, uint8_t cold_junction_channel) {
+void LTC2986_configure_thermocouple(LTC2986_t *LTM, LTC2986_sensor_t type, uint8_t channel_number, uint8_t cold_junction_channel)
+{
 	uint32_t configuration;
 	configuration = type << 27;
 	configuration |= cold_junction_channel << 22;
@@ -149,7 +155,8 @@ void LTC2986_configure_thermocouple(LTC2986_t *LTM, LTC2986_sensor_t type, uint8
   * @param  channel_number To which channel the thermocouple is to be connected
   * @param  resistance Sense resistor value, up to 131 Ohm. There is a 1/1024 resolution.
   */
-void LTC2986_configure_sense_resistor(LTC2986_t *LTM, uint8_t channel_number, float resistance) {
+void LTC2986_configure_sense_resistor(LTC2986_t *LTM, uint8_t channel_number, float resistance)
+{
 	uint32_t configuration = 29 << 27;
 	if(resistance > 131071) {
 		// This is a programming error.
@@ -168,7 +175,8 @@ void LTC2986_configure_sense_resistor(LTC2986_t *LTM, uint8_t channel_number, fl
   *               the configuration information for SPI module.
   * @retval  Boolean Whether the chip is ready for new orders.
   */
-uint8_t LTC2986_is_ready(LTC2986_t *LTM) {
+uint8_t LTC2986_is_ready(LTC2986_t *LTM)
+{
 	uint8_t status;
 	read_RAM(LTM, LTC2986_STATUS_REGISTER, 1, &status);
 	uint8_t started_process = !!(status & START_CONVERTION);
@@ -182,7 +190,8 @@ uint8_t LTC2986_is_ready(LTC2986_t *LTM) {
   *               the configuration information for SPI module.
   * @retval  Status register current value.
   */
-uint8_t LTC2986_read_status(LTC2986_t *LTM) {
+uint8_t LTC2986_read_status(LTC2986_t *LTM)
+{
 	uint8_t status;
 	read_RAM(LTM, LTC2986_STATUS_REGISTER, 1, &status);
 	return(status);
@@ -195,10 +204,50 @@ uint8_t LTC2986_read_status(LTC2986_t *LTM) {
   * @param  channel_number to be read.
   * @retval  Floating point in Celsius (or Fahrenheit, according to configuration) read by LTM chip.
   */
-float LTC2986_measure_channel(LTC2986_t *LTM, uint8_t channel_number) {
+float LTC2986_measure_channel(LTC2986_t *LTM, uint8_t channel_number)
+{
 	uint8_t convert_instruction = channel_number | START_CONVERTION;
 	write_RAM(LTM, LTC2986_COMMAND_REGISTER, 1, &convert_instruction); // We command to initiate the conversion
 	HAL_Delay(10);
+	while(!LTC2986_is_ready(LTM));
+	uint8_t temp[4];
+	uint16_t address = LTC2986_CONVERSION_RESULT_REGISTER + (4 * (channel_number - 1));
+	read_RAM(LTM, address, 4, temp);
+	uint8_t fault = temp[0];
+	if(fault != LTC2986_VALID) {
+		uint8_t return_value[4] = {0xFF, 0xFF, 0xFF, fault};
+		float *casted_return_value;
+		casted_return_value = (float*) return_value;
+		return(*casted_return_value); // Return a NaN with the fault encoded
+	}
+	uint32_t raw_result = (((uint32_t) temp[3]) | ((uint32_t) temp[2] << 8) | ((uint32_t) temp[1] << 16)) & 0x00FFFFFF;
+	float result = ((float) raw_result) / 1024; // Assuming it is a temperature channel (not voltage, for example)
+	return(result);
+}
+
+/**
+  * @brief  Requests a channel to be measured
+  * @param  LTM pointer to a LTC2986 structure that contains
+  *               the configuration information for SPI module.
+  * @param  channel_number to be read.
+  * @retval  Floating point in Celsius (or Fahrenheit, according to configuration) read by LTM chip.
+  */
+void LTC2986_init_measurement(LTC2986_t *LTM, uint8_t channel_number)
+{
+	uint8_t convert_instruction = channel_number | START_CONVERTION;
+	write_RAM(LTM, LTC2986_COMMAND_REGISTER, 1, &convert_instruction); // We command to initiate the conversion
+	return;
+}
+
+/**
+  * @brief  Waits for a previously requested convertion to finish and retrieves the value
+  * @param  LTM pointer to a LTC2986 structure that contains
+  *               the configuration information for SPI module.
+  * @param  channel_number to be read.
+  * @retval  Floating point in Celsius (or Fahrenheit, according to configuration) read by LTM chip.
+  */
+float LTC2986_fetch_measurement(LTC2986_t *LTM, uint8_t channel_number)
+{
 	while(!LTC2986_is_ready(LTM));
 	uint8_t temp[4];
 	uint16_t address = LTC2986_CONVERSION_RESULT_REGISTER + (4 * (channel_number - 1));

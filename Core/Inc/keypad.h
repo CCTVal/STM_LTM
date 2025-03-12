@@ -18,6 +18,7 @@
 #define KEYPAD_NO_KEY		0x000C
 #define KEYPAD_D_KEY		0x000D
 #define KEYPAD_CALIB_KEY	0x000D
+#define KEYPAD_E_KEY		0x000E
 #define KEYPAD_EXIT_KEY		0x000E
 
 
