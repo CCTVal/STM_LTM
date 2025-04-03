@@ -263,3 +263,4 @@ float LTC2986_fetch_measurement(LTC2986_t *LTM, uint8_t channel_number)
 	float result = ((float) raw_result) / 1024; // Assuming it is a temperature channel (not voltage, for example)
 	return(result);
 }
+

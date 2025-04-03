@@ -65,8 +65,15 @@ uint8_t current_channel = 0;
 uint8_t current_chip;
 uint8_t channel_number;
 // Channels: 4 higher bits for the LTM chip and 4 lower bits for the channel.
-uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x11, 0x21, 0x02, 0x12, 0x22, 0x03, 0x13, 0x23, 0x04, 0x14, 0x24, 0x0A, 0x1A, 0x2A, 0x05};
-#define PARALLELIZE 1
+//uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x11, 0x21, 0x02, 0x12, 0x22, 0x03, 0x13, 0x23, 0x04, 0x14, 0x24, 0x0A, 0x1A, 0x2A, 0x05};
+uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x0A, 0x0A, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x1A, 0x1A};
+//uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x02, 0x03, 0x05, 0x06, 0x06, 0x0A, 0x0A, 0x01, 0x02, 0x03, 0x05, 0x06, 0x06, 0x0A, 0x0A};
+#define PARALLELIZE 0
+
+#define ROLLING_MEAN 1
+float measurements[AVAILABLE_CHANNELS * ROLLING_MEAN] = {0};
+float mean;
+uint8_t rolling_cycle = 0;
 
 uint8_t cadena[1] = "0";
 char last_char = '\0'; // To record last character received
@@ -261,7 +268,8 @@ int main(void)
 #endif
 
 	HAL_UART_Transmit(&huart2, (uint8_t *) "----- CPU BOARD CONFIGURED -----\n\r", strlen("----- CPU BOARD CONFIGURED -----\n\r"), 300);
-
+	HAL_UART_Transmit(&huart2, (uint8_t *) "LTM1ch2,LTM1ch3,LTM1ch4,LTM1ch5", strlen("LTM1ch2,LTM1ch2,LTM2ch4,LTM1ch5"), 410);
+	HAL_UART_Transmit(&huart2, (uint8_t *) "LTM1ch6,LTM1RTD,LTM2ch2,LTM2RTD\n\r", strlen("LTM1ch2,LTM1RTD,LTM2ch2,LTM2RTD\n\r"), 410);
 	for(int i = 0; i < 16; i++) {
 		temperatures[i] = 3500;
 	}
@@ -279,6 +287,7 @@ int main(void)
 		//probes_to_be_calibrated[0] = (probes_to_be_calibrated[0] + 1) % 2;
 		//HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, probes_to_be_calibrated[0] ? GPIO_PIN_SET : GPIO_PIN_RESET);
 		 */
+		button_pressed = checkKeypad();
 		switch(CURRENT_STATE) {
 		case NORMAL_STATE:
 			check_menu_input();
@@ -614,29 +623,36 @@ void check_menu_input()
 
 void update_temperatures()
 {
+
 	uint8_t current_chip = (channels[current_channel] & 0xF0) >> 4;
 	uint8_t channel_number = (channels[current_channel] & 0x0F);
+	static uint8_t waiting_measurement = 0;
+	if(!LTC2986_is_ready(&(therms[current_chip]))) {
+		return;
+	}
+	if(!waiting_measurement) {
 #if PARALLELIZE
-	LTC2986_init_measurement(&(therms[current_chip]), channel_number);
-
-	if(current_channel + 1 < 16) {
-		current_chip = (channels[current_channel + 1] & 0xF0) >> 4;
-		channel_number = (channels[current_channel + 1] & 0x0F);
-		LTC2986_init_measurement(&(therms[current_chip]), channel_number);
+		for(int i = 0; i < 3 && current_channel + i < AVAILABLE_CHANNELS; i++) {
+			current_chip = (channels[current_channel + i] & 0xF0) >> 4;
+			channel_number = (channels[current_channel + i] & 0x0F);
+#endif
+			LTC2986_init_measurement(&(therms[current_chip]), channel_number);
+			waiting_measurement++;
+#if PARALLELIZE
+		}
+#endif
+		return;
 	}
-	if(current_channel + 2 < 16) {
-		current_chip = (channels[current_channel + 2] & 0xF0) >> 4;
-		channel_number = (channels[current_channel + 2] & 0x0F);
-		LTC2986_init_measurement(&(therms[current_chip]), channel_number);
-	}
-
-	for(int i = 0; i < 3; i++) {
+#if PARALLELIZE
+	for(int i = 0; i < 3 && waiting_measurement; i++) {
 		current_chip = (channels[current_channel] & 0xF0) >> 4;
 		channel_number = (channels[current_channel] & 0x0F);
-		float temp = LTC2986_fetch_measurement(&(therms[current_chip]), channel_number);
-#else
-		float temp = LTC2986_measure_channel(&(therms[current_chip]), channel_number);
 #endif
+		if(!LTC2986_is_ready(&(therms[current_chip]))) {
+			return;
+		}
+		float temp = LTC2986_fetch_measurement(&(therms[current_chip]), channel_number);
+		waiting_measurement--;
 		uint32_t *measure_result;
 		measure_result = (uint32_t*) &temp;
 		if((((*measure_result) & 0xFFFFFF00) == 0xFFFFFF00) || temp > 99 || temp < 10) { // if temp is NaN
@@ -647,6 +663,11 @@ void update_temperatures()
 			max7219_PrintDigit(current_channel * 4 + 4, BLANK, true);
 		} else {
 			temp = temp * calibration_slope[current_channel] + calibration_offset[current_channel];
+
+			measurements[current_channel + AVAILABLE_CHANNELS * rolling_cycle] = temp;
+			mean = 0;
+			for(int j = 0; j < ROLLING_MEAN; j++) mean += measurements[current_channel + AVAILABLE_CHANNELS * j];
+			temp = mean / ROLLING_MEAN;
 			temperatures[current_channel] = (int)(temp * 100);
 			if(temperatures[current_channel] > 9999 || temperatures[current_channel] < 1000) {
 				temperatures[current_channel] = 0;
@@ -660,14 +681,16 @@ void update_temperatures()
 		}
 		if(++current_channel >= AVAILABLE_CHANNELS) {
 			current_channel = 0;
-			//sprintf(buffer, "%d,%d,%d,%d\n\r", temperatures[0], temperatures[4], temperatures[8], temperatures[3]);
-			//HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+			rolling_cycle = (rolling_cycle + 1) % ROLLING_MEAN;
+			//sprintf(buffer, "%d,%d,%d,%d,%d,", temperatures[1], temperatures[2], temperatures[3], temperatures[4], temperatures[5]);
+			//HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 300);
+			//sprintf(buffer, "%d,%d,%d\n\r", temperatures[6], temperatures[8], temperatures[15]);
+			//HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 300);
 #if PARALLELIZE
 			break;
 		}
 #endif
 	}
-
 	return;
 }
 
@@ -732,7 +755,7 @@ void should_probe_handler()
 		return;
 	} else if(probe_number > 15) {
 		CURRENT_STATE = CONFIRM_PROBES_STATE;
-		lcd_print("Probes to be calibrated\n     YES            EXIT");
+		lcd_print("Probes to be calibrated\n       PRESS-->NEXT EXIT");
 		probe_number = 0;
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_YES_KEY) {
@@ -775,7 +798,7 @@ void confirm_probes_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_YES_KEY) {
 		CURRENT_STATE = ONE_OR_TWO_STATE;
-		lcd_print("Number of cal points\nONE             TWO EXIT");
+		lcd_print("Number of cal points\nONE TWO           EXIT");
 		HAL_UART_Transmit(&huart2, (uint8_t *) "Going to 1 or 2\n\r", strlen("Going to 1 or 2\n\r"), 300);
 		button_pressed = KEYPAD_ERROR_KEY;
 	}
@@ -965,6 +988,8 @@ void input_first_temperature_handler()
 	} else if(button_pressed == KEYPAD_C_KEY) {
 		nominal_temperature = 0;
 		digit_counter = 0;
+		input_minus = 0;
+		input_dot = 0;
 		sprintf(lcd_buffer, "Enter cal temp:         \n+/-   .   CLR ENTER EXIT");
 		lcd_print(lcd_buffer);
 		button_pressed = KEYPAD_ERROR_KEY;
@@ -1099,7 +1124,7 @@ void calibration_complete_handler()
 {
 	lcd_print("System calibrated\nCongratulations!");
 	HAL_Delay(5000);
-	lcd_print("Thermometry Unit\n               CAL.     ");
+	lcd_print(static_message);
 	CURRENT_STATE = NORMAL_STATE;
 	button_pressed = KEYPAD_ERROR_KEY;
 	return;
