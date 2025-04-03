@@ -1259,12 +1259,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 // Keypad handler
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	/*
 	uint16_t key = getKeyAsInt(GPIO_Pin);
 	if(key == KEYPAD_ERROR_KEY) {
 		return;
 	}
-	//HAL_UART_Transmit(&huart2, (uint8_t *) "ExtI\n\r", strlen("ExtI\n\r"), 200);
 	button_pressed = key;
+	*/
+	HAL_UART_Transmit(&huart2, (uint8_t *) "ExtI\n\r", strlen("ExtI\n\r"), 200);
+
 
 }
 

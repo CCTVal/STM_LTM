@@ -168,10 +168,10 @@ char getKeyAsChar(uint16_t GPIO_Pin)
 uint16_t checkKeypad()
 {
 	static keypad_state_t keypad_state = IDLE;
-	static uint64_t debounce_time = 0;
 	static uint16_t trying_key = KEYPAD_ERROR_KEY;
 	static uint64_t initial_time = 0;
 	uint16_t pressed_key = KEYPAD_ERROR_KEY;
+	uint8_t is_key_pressed = 0;
 	switch(keypad_state) {
 	case IDLE:
 		if(isKeyPressed()) {
@@ -179,17 +179,34 @@ uint16_t checkKeypad()
 			trying_key = getPressedKey();
 			initial_time = HAL_GetTick();
 		}
+		break;
 	case PUSH:
+		is_key_pressed = isKeyPressed();
 		pressed_key = getPressedKey();
-		if(isKeyPressed() && HAL_GetTick() - initial_time > debouncing_time && trying_key == pressedKey) {
+		if(is_key_pressed && HAL_GetTick() - initial_time > debouncing_time && trying_key == pressed_key) {
 			keypad_state = HOLD;
 			return(trying_key);
-		} else if(trying_key != pressedKey) {
+		} else if( (!is_key_pressed) || (trying_key != pressed_key) ) {
 			keypad_state = IDLE;
+			trying_key = KEYPAD_ERROR_KEY;
 		}
+		break;
 	case HOLD:
 		if(!isKeyPressed()) {
-			// TODO
+			keypad_state = LIFT;
+			initial_time = HAL_GetTick();
 		}
+		break;
+	case LIFT:
+		is_key_pressed = isKeyPressed();
+		if(is_key_pressed) {
+			keypad_state = HOLD;
+			initial_time = HAL_GetTick();
+		} else if(!is_key_pressed && HAL_GetTick() - initial_time > debouncing_time) {
+			keypad_state = IDLE;
+			trying_key = KEYPAD_ERROR_KEY;
+		}
+		break;
+	}
 	return(KEYPAD_ERROR_KEY);
 }
