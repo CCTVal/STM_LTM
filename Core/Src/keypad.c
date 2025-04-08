@@ -36,10 +36,9 @@ uint8_t isKeyPressed()
 uint16_t getPressedKey()
 {
 	uint16_t row, column;
-	row = (KEYPAD_ERROR_KEY & 0x00F0) >> 2;
+	row = (KEYPAD_ERROR_KEY & 0x00F0) / 4;
 	column = KEYPAD_ERROR_KEY & 0x000F;
 	uint16_t button = KEYPAD_ERROR_KEY;
-	uint32_t currentMillis;
 	GPIO_TypeDef* port;
 	uint16_t GPIO_Pin;
 	if(HAL_GPIO_ReadPin(keypadRow1_GPIO_Port, keypadRow1_Pin)) {
@@ -48,48 +47,41 @@ uint16_t getPressedKey()
 		port = keypadRow1_GPIO_Port;
 	} else if(HAL_GPIO_ReadPin(keypadRow2_GPIO_Port, keypadRow2_Pin)) {
 		GPIO_Pin = keypadRow2_Pin;
-		row = 0;
+		row = 1;
 		port = keypadRow2_GPIO_Port;
 	} else if(HAL_GPIO_ReadPin(keypadRow3_GPIO_Port, keypadRow3_Pin)) {
 		GPIO_Pin = keypadRow3_Pin;
-		row = 0;
+		row = 2;
 		port = keypadRow3_GPIO_Port;
 	} else if(HAL_GPIO_ReadPin(keypadRow4_GPIO_Port, keypadRow4_Pin)) {
 		GPIO_Pin = keypadRow4_Pin;
-		row = 0;
+		row = 3;
 		port = keypadRow4_GPIO_Port;
 	} else {
 		return(KEYPAD_ERROR_KEY);
 	}
 
-	currentMillis = HAL_GetTick();
-	if (currentMillis - previousMillis > debouncing_time) {
-		if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
-			return(KEYPAD_ERROR_KEY);
-		}
-		HAL_GPIO_WritePin(keypadColumn1_GPIO_Port, keypadColumn1_Pin, GPIO_PIN_RESET);
-		if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
-			column = 0;
-		}
-		HAL_GPIO_WritePin(keypadColumn1_GPIO_Port, keypadColumn1_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(keypadColumn2_GPIO_Port, keypadColumn2_Pin, GPIO_PIN_RESET);
-		if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
-			column = 1;
-		}
-		HAL_GPIO_WritePin(keypadColumn2_GPIO_Port, keypadColumn2_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(keypadColumn3_GPIO_Port, keypadColumn3_Pin, GPIO_PIN_RESET);
-		if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
-			column = 2;
-		}
-		HAL_GPIO_WritePin(keypadColumn3_GPIO_Port, keypadColumn3_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, GPIO_PIN_RESET);
-		if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
-			column = 3;
-		}
-		HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, GPIO_PIN_SET);
-		button = column + row * 4;
+	HAL_GPIO_WritePin(keypadColumn1_GPIO_Port, keypadColumn1_Pin, GPIO_PIN_RESET);
+	if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
+		column = 0;
 	}
-	previousMillis = currentMillis;
+	HAL_GPIO_WritePin(keypadColumn1_GPIO_Port, keypadColumn1_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(keypadColumn2_GPIO_Port, keypadColumn2_Pin, GPIO_PIN_RESET);
+	if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
+		column = 1;
+	}
+	HAL_GPIO_WritePin(keypadColumn2_GPIO_Port, keypadColumn2_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(keypadColumn3_GPIO_Port, keypadColumn3_Pin, GPIO_PIN_RESET);
+	if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
+		column = 2;
+	}
+	HAL_GPIO_WritePin(keypadColumn3_GPIO_Port, keypadColumn3_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, GPIO_PIN_RESET);
+	if(!HAL_GPIO_ReadPin(port, GPIO_Pin)) {
+		column = 3;
+	}
+	HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, GPIO_PIN_SET);
+	button = column + row * 4;
 	return(button);
 }
 

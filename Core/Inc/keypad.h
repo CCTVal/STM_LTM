@@ -25,6 +25,7 @@
 void keypad_Init();
 uint16_t getKeyAsInt(uint16_t GPIO_Pin);
 char getKeyAsChar(uint16_t GPIO_Pin);
+uint16_t getPressedKey();
 uint16_t checkKeypad();
 
 #endif /* KEYPAD_H_ */

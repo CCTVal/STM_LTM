@@ -288,6 +288,9 @@ int main(void)
 		//HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, probes_to_be_calibrated[0] ? GPIO_PIN_SET : GPIO_PIN_RESET);
 		 */
 		button_pressed = checkKeypad();
+		//sprintf(buffer, "key: %02X \n\r", getPressedKey());
+		//if(buffer[5] != 'F')
+		//	HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
 		switch(CURRENT_STATE) {
 		case NORMAL_STATE:
 			check_menu_input();
@@ -1266,7 +1269,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 	button_pressed = key;
 	*/
-	HAL_UART_Transmit(&huart2, (uint8_t *) "ExtI\n\r", strlen("ExtI\n\r"), 200);
+	//HAL_UART_Transmit(&huart2, (uint8_t *) "ExtI\n\r", strlen("ExtI\n\r"), 200);
 
 
 }
