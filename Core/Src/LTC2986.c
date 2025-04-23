@@ -140,8 +140,8 @@ void LTC2986_configure_thermocouple(LTC2986_t *LTM, LTC2986_sensor_t type, uint8
 	configuration = type << 27;
 	configuration |= cold_junction_channel << 22;
 	configuration |= 0b1 << 21; // Single-ended
-	configuration |= 0b0 << 20; // TC_OPEN_CKT_DETECT__NO
-	configuration |= 0x0 << 18; // TC_OPEN_CKT_DETECT_CURRENT__10UA
+	configuration |= 0b1 << 20; // TC_OPEN_CKT_DETECT__NO
+	configuration |= 0x1 << 18; // TC_OPEN_CKT_DETECT_CURRENT__10UA
 	uint8_t temp[4];
 	int32_to_int8_array(configuration, temp);
 	write_RAM(LTM, LTC2986_CH_ADDRESS_BASE + (4 * (channel_number - 1)), 4, temp);

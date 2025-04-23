@@ -8,7 +8,7 @@
 #include "keypad.h"
 
 uint32_t previousMillis = 0;
-uint64_t debouncing_time = 150;
+uint64_t debouncing_time = 30;
 
 typedef enum {
 	IDLE		= 0x00,

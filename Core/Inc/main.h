@@ -122,6 +122,7 @@ typedef enum {
 } calibrated_t;
 
 void check_menu_input();
+void check_input_voltage();
 void update_temperatures();
 void calibrate_all_probes_handler();
 void confirm_detected_handler();
