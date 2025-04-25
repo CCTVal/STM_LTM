@@ -110,7 +110,11 @@ typedef enum {
 	INPUT_FIRST_TEMPERATURE_STATE = 0x09,
 	PLACE_SECOND_POINT_STATE = 0x0A,
 	INPUT_SECOND_TEMPERATURE_STATE = 0x0B,
-	CALIBRATION_COMPLETE_STATE = 0x0C
+	CALIBRATION_COMPLETE_STATE = 0x0C,
+	TEST1_STATE = 0x0D,
+	SHOW_2V5_VOLTAGE_STATE = 0x0E,
+	SHOW_3V3_VOLTAGE_STATE = 0x0F,
+	RESET_CALIBRATION_STATE = 0X10
 } calibration_state_t;
 
 typedef enum {
@@ -136,6 +140,10 @@ void input_first_temperature_handler();
 void place_second_point_handler();
 void input_second_temperature_handler();
 void calibration_complete_handler();
+void test1_handler();
+void show_2v5_voltage_handler();
+void show_3v3_voltage_handler();
+void reset_calibration_handler();
 
 /* USER CODE END Private defines */
 

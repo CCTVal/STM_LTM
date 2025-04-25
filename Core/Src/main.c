@@ -75,8 +75,12 @@ uint8_t channel_number;
 // Channels: 4 higher bits for the LTM chip and 4 lower bits for the channel.
 uint8_t channels[AVAILABLE_CHANNELS] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x0A, 0x0A, 0x11, 0x12, 0x13, 0x24, 0x25, 0x0A, 0x1A, 0x2A};
 //uint8_t channels[AVAILABLE_CHANNELS] = {0x02, 0x01, 0x25, 0x21, 0x03, 0x13, 0x26, 0x22, 0x04, 0x14, 0x11, 0x23, 0x05, 0x15, 0x12, 0x24};
-uint8_t channel_order[18] = {1,0,4,8,12,16,10,14,5,9,13,17,3,7,11,15,2,6};
-#define PARALLELIZE 0
+// channel_order: LTM1ch1, LTM2ch1, LTM3ch1, LTM1ch2, LTM2ch2,...
+uint8_t channel_order[18] = {1,10,3,0,14,7,4,5,11,8,9,15,12,13,2,16,17,6};
+		//{1, 0,  4,  8, 12, 16,
+		//10,14,  5,  9, 13, 17,
+		//3,  7, 11, 15,  2,  6};
+#define PARALLELIZE 1
 
 #define ROLLING_MEAN 4
 float measurements[AVAILABLE_CHANNELS * ROLLING_MEAN] = {0};
@@ -103,8 +107,8 @@ int last_calibration_address = calibration_data_address + 128;
 float *calibration_offset = calibration_data;
 float *calibration_slope  = calibration_data + 16;
 calibrated_t *last_calibration = (void*) (calibration_data + 32);
-#define LOAD_CALIBRATION 1
-#define SAVE_CALIBRATION 1
+#define LOAD_CALIBRATION 0
+#define SAVE_CALIBRATION 0
 
 float calibration_first_point = 0;
 float calibration_reference[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
@@ -304,11 +308,11 @@ int main(void)
 		//HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, probes_to_be_calibrated[0] ? GPIO_PIN_SET : GPIO_PIN_RESET);
 		 */
 		button_pressed = checkKeypad();
-		if(adc_ready) {
+		if(adc_ready && CURRENT_STATE != SHOW_3V3_VOLTAGE_STATE && CURRENT_STATE != SHOW_2V5_VOLTAGE_STATE) {
 			check_input_voltage();
 			adc_ready = 0;
 			// Start the conversion sequence
-			HAL_ADC_Start(&hadc1);
+			HAL_ADC_Start_IT(&hadc1);
 		}
 		//sprintf(buffer, "key: %02X \n\r", getPressedKey());
 		//if(buffer[5] != 'F')
@@ -360,6 +364,21 @@ int main(void)
 		case CALIBRATION_COMPLETE_STATE:
 			calibration_complete_handler();
 			break;
+		case TEST1_STATE:
+			test1_handler();
+			update_temperatures();
+			break;
+		case SHOW_2V5_VOLTAGE_STATE:
+			show_2v5_voltage_handler();
+			update_temperatures();
+			break;
+		case SHOW_3V3_VOLTAGE_STATE:
+			show_3v3_voltage_handler();
+			update_temperatures();
+			break;
+		case RESET_CALIBRATION_STATE:
+			reset_calibration_handler();
+			update_temperatures();
 		default:
 			break;
 		}
@@ -710,6 +729,12 @@ void check_menu_input()
 		CURRENT_STATE = CALIBRATE_ALL_PROBES_STATE;
 		button_pressed = KEYPAD_ERROR_KEY;
 		return;
+	} else if(button_pressed == KEYPAD_E_KEY) {
+		lcd_print("   SYSTEM SELF TEST     \nINT 2.5V  3.3V      EXIT");
+		HAL_UART_Transmit(&huart2, (uint8_t *) "Init test.\n\r", strlen("Init test.\n\r"), 300);
+		CURRENT_STATE = TEST1_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+		return;
 	}
 }
 
@@ -727,8 +752,6 @@ void update_temperatures()
 		channel_number = current_channel / 3 + 1;
 		for(int i = 0; i < 3 && current_channel + i < AVAILABLE_CHANNELS; i++) {
 			current_chip = i;
-			//current_chip = (channels[current_channel + i] & 0xF0) >> 4;
-			//channel_number = (channels[current_channel + i] & 0x0F);
 #endif
 			LTC2986_init_measurement(&(therms[current_chip]), channel_number);
 			waiting_measurement++;
@@ -1223,6 +1246,7 @@ void input_second_temperature_handler()
 	}
 	return;
 }
+
 void calibration_complete_handler()
 {
 	lcd_print("System calibrated\nCongratulations!");
@@ -1230,6 +1254,114 @@ void calibration_complete_handler()
 	lcd_print(static_message);
 	CURRENT_STATE = NORMAL_STATE;
 	button_pressed = KEYPAD_ERROR_KEY;
+	return;
+}
+
+void test1_handler()
+{
+	if(button_pressed == KEYPAD_A_KEY) {
+		lcd_print("RESET CALIBRATION?\nYES  NO        NEXT EXIT");
+		CURRENT_STATE = RESET_CALIBRATION_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+		return;
+	} else if(button_pressed == KEYPAD_B_KEY) {
+		lcd_print("MEASURING VOLTAGE...\n                        ");
+		CURRENT_STATE = SHOW_2V5_VOLTAGE_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+		return;
+	} else if(button_pressed == KEYPAD_C_KEY) {
+		lcd_print("MEASURING VOLTAGE...\n                        ");
+		CURRENT_STATE = SHOW_3V3_VOLTAGE_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+		return;
+	} else if(button_pressed == KEYPAD_E_KEY) {
+		lcd_print(static_message);
+		CURRENT_STATE = NORMAL_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+		return;
+	}
+	return;
+}
+
+void show_2v5_voltage_handler()
+{
+	static uint32_t previousMillis = 0;
+	static uint32_t currentMillis = 0;
+	currentMillis = HAL_GetTick();
+	if (currentMillis - previousMillis > 1000 && adc_ready) {
+		uint32_t vrefint_raw = HAL_ADC_GetValue(&hadc1);
+		float vrefint = vrefint_raw * 3300 / (pow(2, ADC_BITS) - 1);
+		// V_DDA = Nominal VDDA * Nominal V_ref / Real V_ref
+		uint32_t vdda_voltage = 3300 * 1210 / vrefint;
+		sprintf(lcd_buffer, "+3300mV SUPPLY = %d\n                    EXIT", (int) vdda_voltage);
+		lcd_print(lcd_buffer);
+		adc_ready = 0;
+		HAL_ADC_Start_IT(&hadc1);
+		previousMillis = currentMillis;
+	} else if(button_pressed == KEYPAD_E_KEY) {
+		lcd_print(static_message);
+		CURRENT_STATE = NORMAL_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+	}
+	return;
+}
+
+void show_3v3_voltage_handler()
+{
+	static uint32_t previousMillis = 0;
+	static uint32_t currentMillis = 0;
+
+	currentMillis = HAL_GetTick();
+	if (currentMillis - previousMillis > 1000 && adc_ready) {
+		uint32_t vrefint_raw = HAL_ADC_GetValue(&hadc1);
+		float vrefint = vrefint_raw * 3300 / (pow(2, ADC_BITS) - 1);
+		// V_DDA = Nominal VDDA * Nominal V_ref / Real V_ref
+		uint32_t vdda_voltage = 3300 * 1210 / vrefint;
+		sprintf(lcd_buffer, "+3300mV SUPPLY = %d\n                    EXIT", (int) vdda_voltage);
+		lcd_print(lcd_buffer);
+		adc_ready = 0;
+		HAL_ADC_Start_IT(&hadc1);
+		previousMillis = currentMillis;
+	} else if(button_pressed == KEYPAD_E_KEY) {
+		lcd_print(static_message);
+		CURRENT_STATE = NORMAL_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+	}
+	return;
+}
+
+void reset_calibration_handler()
+{
+	if(button_pressed == KEYPAD_A_KEY) {
+		lcd_print("       RESTORING        \n FACTORY CALIBRATION... ");
+		for(int i = 0; i < 16; i++) {
+			calibration_slope[i] = 1;
+			calibration_offset[i] = 0;
+		}
+		*last_calibration = FACTORY_CALIBRATED;
+#if SAVE_CALIBRATION
+		if(!(memory_ready && ee_format(1))) { // error
+			memory_ready = false;
+			return;
+		}
+		if(memory_ready && !ee_write(calibration_data_address, 2 * 4 * AVAILABLE_CHANNELS + 4, (uint8_t *) calibration_data))memory_ready = false;
+#endif
+		CURRENT_STATE = NORMAL_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+		HAL_Delay(2500);
+		lcd_print(static_message);
+		return;
+	}else if(button_pressed == KEYPAD_B_KEY || button_pressed == KEYPAD_C_KEY || button_pressed == KEYPAD_D_KEY) {
+		lcd_print("   SYSTEM SELF TEST     \nINT 2.5V  3.3V      EXIT");
+		CURRENT_STATE = TEST1_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+		return;
+	} else if(button_pressed == KEYPAD_E_KEY) {
+		lcd_print(static_message);
+		CURRENT_STATE = NORMAL_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+		return;
+	}
 	return;
 }
 
