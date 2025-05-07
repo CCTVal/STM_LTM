@@ -55,6 +55,8 @@ ADC_HandleTypeDef hadc1;
 
 I2C_HandleTypeDef hi2c3;
 
+IWDG_HandleTypeDef hiwdg;
+
 SPI_HandleTypeDef hspi2;
 SPI_HandleTypeDef hspi3;
 
@@ -133,6 +135,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_I2C3_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -179,6 +182,7 @@ int main(void)
   MX_SPI3_Init();
   MX_I2C3_Init();
   MX_ADC1_Init();
+
   /* USER CODE BEGIN 2 */
 
   /*
@@ -291,8 +295,8 @@ int main(void)
 	for(int i = 0; i < 16; i++) {
 		temperatures[i] = 0;
 	}
-
 	lcd_print(static_message);
+	MX_IWDG_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -307,6 +311,7 @@ int main(void)
 		//probes_to_be_calibrated[0] = (probes_to_be_calibrated[0] + 1) % 2;
 		//HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, probes_to_be_calibrated[0] ? GPIO_PIN_SET : GPIO_PIN_RESET);
 		 */
+		HAL_IWDG_Refresh(&hiwdg);
 		button_pressed = checkKeypad();
 		if(adc_ready && CURRENT_STATE != SHOW_3V3_VOLTAGE_STATE && CURRENT_STATE != SHOW_2V5_VOLTAGE_STATE) {
 			check_input_voltage();
@@ -410,9 +415,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
@@ -522,6 +528,34 @@ static void MX_I2C3_Init(void)
   /* USER CODE BEGIN I2C3_Init 2 */
 
   /* USER CODE END I2C3_Init 2 */
+
+}
+
+/**
+  * @brief IWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_IWDG_Init(void)
+{
+
+  /* USER CODE BEGIN IWDG_Init 0 */
+
+  /* USER CODE END IWDG_Init 0 */
+
+  /* USER CODE BEGIN IWDG_Init 1 */
+
+  /* USER CODE END IWDG_Init 1 */
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
+  hiwdg.Init.Reload = 4095;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN IWDG_Init 2 */
+
+  /* USER CODE END IWDG_Init 2 */
 
 }
 
