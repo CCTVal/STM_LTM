@@ -182,7 +182,7 @@ int main(void)
   MX_SPI3_Init();
   MX_I2C3_Init();
   MX_ADC1_Init();
-
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
   /*
@@ -210,6 +210,7 @@ int main(void)
 		HAL_GPIO_WritePin(therms[current_chip].cs_pin.gpio_port, therms[current_chip].cs_pin.gpio_pin, GPIO_PIN_SET);
 	}
 	for(current_chip = 0; current_chip < 3; current_chip++) { // TODO: < 3
+		HAL_IWDG_Refresh(&hiwdg);
 		HAL_Delay(400); // Delay for LTM init
 		sprintf(buffer, "LTM%d initializing\n\r", current_chip);
 		HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
@@ -296,7 +297,6 @@ int main(void)
 		temperatures[i] = 0;
 	}
 	lcd_print(static_message);
-	MX_IWDG_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -547,7 +547,7 @@ static void MX_IWDG_Init(void)
 
   /* USER CODE END IWDG_Init 1 */
   hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_128;
   hiwdg.Init.Reload = 4095;
   if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
   {
