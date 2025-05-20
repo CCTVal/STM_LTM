@@ -109,7 +109,7 @@ int last_calibration_address = calibration_data_address + 128;
 float *calibration_offset = calibration_data;
 float *calibration_slope  = calibration_data + 16;
 calibrated_t *last_calibration = (void*) (calibration_data + 32);
-#define LOAD_CALIBRATION 0
+#define LOAD_CALIBRATION 1
 #define SAVE_CALIBRATION 0
 
 float calibration_first_point = 0;
@@ -120,6 +120,7 @@ uint8_t input_dot = 0;
 float nominal_temperature = 0;
 
 char static_message[50] = "      SYSTEM READY     C\nCAL.                TEST";
+uint32_t init_message_time = 0;
 
 char buffer[100] = {0};
 char lcd_buffer[100] = {0};
@@ -143,6 +144,13 @@ static void MX_IWDG_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 LTC2986_t therms[3] = {{&hspi2, {LTM1_CS_GPIO_Port, LTM1_CS_Pin}}, {&hspi2, {LTM2_CS_GPIO_Port, LTM2_CS_Pin}}, {&hspi2, {LTM3_CS_GPIO_Port, LTM3_CS_Pin}}};
+
+// HAL_UART_Transmit wrapper
+void UART_Transmit(char* text, int timeout)
+{
+	HAL_UART_Transmit(&huart2, (uint8_t *) text, strlen(text), timeout);
+	HAL_IWDG_Refresh(&hiwdg);
+}
 
 /* USER CODE END 0 */
 
@@ -191,10 +199,17 @@ int main(void)
   	 *
   	 */
   	lcd_init();
-  	HAL_Delay(1500);
-  	lcd_print("Initializing...");
-	HAL_UART_Receive_IT(&huart2, cadena, 1);
+  	for(int i = 0; i < 15; i++) {
+		HAL_IWDG_Refresh(&hiwdg);
+		HAL_Delay(100);
+  	}
+  	HAL_IWDG_Refresh(&hiwdg);
 
+  	if(__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST))
+  		lcd_print("ERROR\nREBOOTING...");
+  	else
+  		lcd_print("Initializing...");
+	HAL_UART_Receive_IT(&huart2, cadena, 1);
 	/*
 	 * ADC INIT
 	 */
@@ -211,21 +226,24 @@ int main(void)
 	}
 	for(current_chip = 0; current_chip < 3; current_chip++) { // TODO: < 3
 		HAL_IWDG_Refresh(&hiwdg);
-		HAL_Delay(400); // Delay for LTM init
+		for(int i = 0; i < 4; i++) {
+			HAL_Delay(100); // Delay for LTM init
+			HAL_IWDG_Refresh(&hiwdg);
+		}
 		sprintf(buffer, "LTM%d initializing\n\r", current_chip);
-		HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		UART_Transmit(buffer, 200);
 		while(!LTC2986_is_ready(therms + current_chip));
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Config:\n\n\r", strlen("Config:\n\n\r"), 200);
+		UART_Transmit("Config:\n\n\r", 200);
 		LTC2986_global_configure(therms + current_chip);
-		HAL_UART_Transmit(&huart2, (uint8_t *) "General config OK\n\r", strlen("General config OK\n\r"), 200);
+		UART_Transmit("General config OK\n\r", 200);
 		LTC2986_configure_rtd(therms + current_chip, LTC2986_RTD_PT_100, 10, 8);
-		HAL_UART_Transmit(&huart2, (uint8_t *) "PT100 config OK\n\r", strlen("PT100 config OK\n\r"), 200);
+		UART_Transmit("PT100 config OK\n\r", 200);
 		LTC2986_configure_sense_resistor(therms + current_chip, 8, 1000);
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Sense R config OK\n\r", strlen("Sense R config OK\n\r"), 200);
+		UART_Transmit("Sense R config OK\n\r", 200);
 		for(int i = 1; i < 7; i++) {
 			LTC2986_configure_thermocouple(therms + current_chip, LTC2986_TYPE_T_THERMOCOUPLE, i, 10);
 			sprintf(buffer, "CH %d Therm config OK\n\r", i);
-			HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+			UART_Transmit(buffer, 200);
 		}
 	}
 
@@ -236,7 +254,9 @@ int main(void)
 	 */
 	max7219_Init(3);
 	max7219_Decode_Off();
-	HAL_Delay(4000); //Explain this Delay
+	HAL_IWDG_Refresh(&hiwdg);
+	HAL_Delay(50); //This Delay is unnecessary
+	HAL_IWDG_Refresh(&hiwdg);
 	max7219_Clean();
 	max7219_PrintFtos(DIGIT_1, -3.14, 2);
 	max7219_PrintDigit(DIGIT_1, LETTER_E, false);
@@ -248,7 +268,6 @@ int main(void)
 	max7219_PrintDigit(14, LETTER_E, false);
 	max7219_PrintDigit(15, LETTER_L, false);
 	max7219_PrintDigit(16, LETTER_P, false);
-	HAL_Delay(1000);
 
 	/*
 	 *
@@ -256,7 +275,7 @@ int main(void)
 	 *
 	 */
 	keypad_Init();
-
+	HAL_IWDG_Refresh(&hiwdg);
 	/*
 	 *
 	 * MEMORY INIT
@@ -264,34 +283,35 @@ int main(void)
 	 */
 	if(ee_init()) {
 		memory_ready = true;
+		HAL_IWDG_Refresh(&hiwdg);
 	} else { // error
 		memory_ready = false;
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Memory init. error\n\r", strlen("Memory init. error\n\r"), 300);
+		UART_Transmit("Memory init. error\n\r", 300);
 	}
 #if LOAD_CALIBRATION
 	if(ee_read(last_calibration_address, 1, last_calibration)) {
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Calibration status read\n\r", strlen("Calibration status read\n\r"), 300);
+		UART_Transmit("Calibration status read\n\r", 300);
 		*last_calibration = (*last_calibration) & (~JUST_CALIBRATED);
 	} else {
 		 memory_ready = false;
-		 HAL_UART_Transmit(&huart2, (uint8_t *) "Memory read error\n\r", strlen("Memory read error\n\r"), 300);
+		 UART_Transmit("Memory read error\n\r", 300);
 	}
 
 	if((*last_calibration & PREVIOUSLY_CALIBRATED)) {
 		if(ee_read(calibration_offset_address, 0x4 * 16, (uint8_t*) calibration_offset)) {
-			HAL_UART_Transmit(&huart2, (uint8_t *) "Calibration offset read\n\r", strlen("Calibration offset read\n\r"), 300);
+			UART_Transmit("Calibration offset read\n\r", 300);
 			sprintf(buffer, "Offset 1: %f \n\r", calibration_offset[1]);
-			HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+			UART_Transmit(buffer, 200);
 		}
 	}
 	if((*last_calibration & PREVIOUSLY_CALIBRATED) && (*last_calibration & TWO_POINT_CALIBRATED) && ee_read(calibration_slope_address, 0x4 * AVAILABLE_CHANNELS, (uint8_t*) calibration_slope)) {
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Calibration slope read\n\r", strlen("Calibration slope read\n\r"), 300);
+		UART_Transmit("Calibration slope read\n\r", 300);
 		sprintf(buffer, "Slope 1: %f \n\r", calibration_slope[1]);
-		HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		UART_Transmit(buffer, 200);
 	}
 #endif
 
-	HAL_UART_Transmit(&huart2, (uint8_t *) "----- CPU BOARD CONFIGURED -----\n\r", strlen("----- CPU BOARD CONFIGURED -----\n\r"), 300);
+	UART_Transmit("----- CPU BOARD CONFIGURED -----\n\r", 300);
 	//HAL_UART_Transmit(&huart2, (uint8_t *) "LTM1ch2,LTM2ch1\n\r", strlen("LTM1RTD,LTM2ch1\n\r"), 410); // DEBUG
 	for(int i = 0; i < 16; i++) {
 		temperatures[i] = 0;
@@ -307,10 +327,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		/* // Uncomment for time measurement
-		//probes_to_be_calibrated[0] = (probes_to_be_calibrated[0] + 1) % 2;
-		//HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, probes_to_be_calibrated[0] ? GPIO_PIN_SET : GPIO_PIN_RESET);
-		 */
+		// Uncomment for time measurement
+		probes_to_be_calibrated[0] = (probes_to_be_calibrated[0] + 1) % 2;
+		HAL_GPIO_WritePin(keypadColumn4_GPIO_Port, keypadColumn4_Pin, probes_to_be_calibrated[0] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
 		HAL_IWDG_Refresh(&hiwdg);
 		button_pressed = checkKeypad();
 		if(adc_ready && CURRENT_STATE != SHOW_3V3_VOLTAGE_STATE && CURRENT_STATE != SHOW_2V5_VOLTAGE_STATE) {
@@ -325,6 +345,10 @@ int main(void)
 		switch(CURRENT_STATE) {
 		case NORMAL_STATE:
 			check_menu_input();
+			update_temperatures();
+			break;
+		case INIT_CALIBRATION_STATE:
+			init_calibration_handler();
 			update_temperatures();
 			break;
 		case CALIBRATE_ALL_PROBES_STATE:
@@ -547,7 +571,7 @@ static void MX_IWDG_Init(void)
 
   /* USER CODE END IWDG_Init 1 */
   hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_128;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_16;
   hiwdg.Init.Reload = 4095;
   if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
   {
@@ -757,19 +781,29 @@ void check_menu_input()
 {
 	if(button_pressed == KEYPAD_CALIB_KEY) {
 		lcd_print("   SYSTEM CALIBRATION   \n                        ");
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Init calib.\n\r", strlen("Init calib.\n\r"), 300);
-		HAL_Delay(3000);
-		lcd_print("Calibrate all probes?\nYES  NO        NEXT EXIT");
-		CURRENT_STATE = CALIBRATE_ALL_PROBES_STATE;
+		UART_Transmit("Init calib.\n\r", 300);
+		init_message_time = HAL_GetTick();
+		CURRENT_STATE = INIT_CALIBRATION_STATE;
 		button_pressed = KEYPAD_ERROR_KEY;
+
 		return;
 	} else if(button_pressed == KEYPAD_E_KEY) {
 		lcd_print("   SYSTEM SELF TEST     \nINT 2.5V  3.3V      EXIT");
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Init test.\n\r", strlen("Init test.\n\r"), 300);
+		UART_Transmit("Init test.\n\r", 300);
 		CURRENT_STATE = TEST1_STATE;
 		button_pressed = KEYPAD_ERROR_KEY;
 		return;
 	}
+}
+
+void init_calibration_handler()
+{
+	if(HAL_GetTick() > init_message_time + 3000) {
+		lcd_print("Calibrate all probes?\nYES  NO        NEXT EXIT");
+		CURRENT_STATE = CALIBRATE_ALL_PROBES_STATE;
+		button_pressed = KEYPAD_ERROR_KEY;
+	}
+
 }
 
 void update_temperatures()
@@ -959,7 +993,7 @@ void confirm_probes_handler()
 	} else if(button_pressed == KEYPAD_D_KEY) {
 		CURRENT_STATE = ONE_OR_TWO_STATE;
 		lcd_print("Number of cal points\nONE TWO           EXIT");
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Going to 1 or 2\n\r", strlen("Going to 1 or 2\n\r"), 300);
+		UART_Transmit("Going to 1 or 2\n\r", 300);
 		button_pressed = KEYPAD_ERROR_KEY;
 	}
 	return;
@@ -973,7 +1007,7 @@ void one_or_two_handler()
 	} else if(button_pressed == KEYPAD_A_KEY) {
 		CURRENT_STATE = PLACE_ONLY_POINT_STATE;
 		lcd_print("Place probes for cal\n               NEXT EXIT");
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Going to place o\n\r", strlen("Going to place 1\n\r"), 300);
+		UART_Transmit("Going to place o\n\r", 300);
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_B_KEY) {
 		CURRENT_STATE = PLACE_FIRST_POINT_STATE;
@@ -995,7 +1029,7 @@ void place_only_point_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 		sprintf(lcd_buffer, "Enter cal temp:         \n+/-   .   CLR ENTER EXIT");
 		lcd_print(lcd_buffer);
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Pressed B\n\r", strlen("Pressed B\n\r"), 300);
+		UART_Transmit("Pressed B\n\r", 300);
 		digit_counter = 0;
 		nominal_temperature = 0;
 	}
@@ -1046,7 +1080,7 @@ void input_only_temperature_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_A_KEY) {
 		input_minus = (input_minus + 1 ) % 2;
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Switching minus\n\r", strlen("Switching minus\n\r"), 300);
+		UART_Transmit("Switching minus\n\r", 300);
 		if(input_minus)
 			lcd_buffer[16] = '-';
 		else
@@ -1055,7 +1089,7 @@ void input_only_temperature_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_B_KEY) {
 		input_dot = digit_counter;
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Switching dot\n\r", strlen("Switching dot\n\r"), 300);
+		UART_Transmit("Switching dot\n\r", 300);
 		if(input_dot)
 			lcd_buffer[17 + digit_counter] = '.';
 		else
@@ -1076,9 +1110,10 @@ void input_only_temperature_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 		nominal_temperature = (input_minus ? -1 : 1) * nominal_temperature;
 		sprintf(buffer, "temp: %.7f\n\r", nominal_temperature);
-		HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		UART_Transmit(buffer, 200);
 		digit_counter = 0;
 		calibrate_one_point();
+		lcd_print("System calibrated\nCongratulations!");
 	}
 
 	return;
@@ -1135,7 +1170,7 @@ void input_first_temperature_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_B_KEY) {
 		input_dot = digit_counter;
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Switching dot\n\r", strlen("Switching dot\n\r"), 300);
+		UART_Transmit("Switching dot\n\r", 300);
 		if(input_dot)
 			lcd_buffer[17 + digit_counter] = '.';
 		else
@@ -1167,7 +1202,7 @@ void input_first_temperature_handler()
 			}
 		}
 		sprintf(buffer, "temp: %.7f\n\r", nominal_temperature);
-		HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		UART_Transmit(buffer, 200);
 	}
 	return;
 }
@@ -1234,7 +1269,7 @@ void input_second_temperature_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_A_KEY) {
 		input_minus = (input_minus + 1 ) % 2;
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Switching minus\n\r", strlen("Switching minus\n\r"), 300);
+		UART_Transmit("Switching minus\n\r", 300);
 		if(input_minus)
 			lcd_buffer[16] = '-';
 		else
@@ -1243,7 +1278,7 @@ void input_second_temperature_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 	} else if(button_pressed == KEYPAD_B_KEY) {
 		input_dot = digit_counter;
-		HAL_UART_Transmit(&huart2, (uint8_t *) "Switching dot\n\r", strlen("Switching dot\n\r"), 300);
+		UART_Transmit("Switching dot\n\r", 300);
 		if(input_dot)
 			lcd_buffer[17 + digit_counter] = '.';
 		else
@@ -1264,29 +1299,29 @@ void input_second_temperature_handler()
 		button_pressed = KEYPAD_ERROR_KEY;
 		nominal_temperature = (input_minus ? -1 : 1) * nominal_temperature;
 		sprintf(buffer, "temp: %.7f\n\r", nominal_temperature);
-		HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		UART_Transmit(buffer, 200);
 		digit_counter = 0;
 		if(!(nominal_temperature - calibration_first_point)) {
 			lcd_print("Second temperature can\nnot be same as first");
-			HAL_Delay(5000);
-			CURRENT_STATE = NORMAL_STATE;
-			lcd_print(static_message);
+			CURRENT_STATE = CALIBRATION_COMPLETE_STATE;
 			button_pressed = KEYPAD_ERROR_KEY;
 			return;
 		}
 		sprintf(buffer, "temp: %.7f\n\r", nominal_temperature);
-		HAL_UART_Transmit(&huart2, (uint8_t *) buffer, strlen(buffer), 200);
+		UART_Transmit(buffer, 200);
 		calibrate_two_points();
+		lcd_print("System calibrated\nCongratulations!");
+		init_message_time = HAL_GetTick();
 	}
 	return;
 }
 
 void calibration_complete_handler()
 {
-	lcd_print("System calibrated\nCongratulations!");
-	HAL_Delay(5000);
-	lcd_print(static_message);
-	CURRENT_STATE = NORMAL_STATE;
+	if(HAL_GetTick() > init_message_time + 5000) {
+		lcd_print(static_message);
+		CURRENT_STATE = NORMAL_STATE;
+	}
 	button_pressed = KEYPAD_ERROR_KEY;
 	return;
 }
@@ -1380,9 +1415,8 @@ void reset_calibration_handler()
 		}
 		if(memory_ready && !ee_write(calibration_data_address, 2 * 4 * AVAILABLE_CHANNELS + 4, (uint8_t *) calibration_data))memory_ready = false;
 #endif
-		CURRENT_STATE = NORMAL_STATE;
+		CURRENT_STATE = CALIBRATION_COMPLETE_STATE;
 		button_pressed = KEYPAD_ERROR_KEY;
-		HAL_Delay(2500);
 		lcd_print(static_message);
 		return;
 	}else if(button_pressed == KEYPAD_B_KEY || button_pressed == KEYPAD_C_KEY || button_pressed == KEYPAD_D_KEY) {
@@ -1429,6 +1463,7 @@ void N_name_and_status_handler(){
 	char *s;
 	for ( s=respuesta_N; *s != '\0'; s++ ) {
 		HAL_UART_Transmit(&huart2,(uint8_t *)s , 1, 100);
+		//HAL_IWDG_Refresh(&hiwdg);
 	}
 }
 
@@ -1437,6 +1472,7 @@ void done(){
 	char *s;
 	for ( s=respuesta_N; *s != '\0'; s++ ) {
 		HAL_UART_Transmit(&huart2,(uint8_t *)s , 1, 100);
+		HAL_IWDG_Refresh(&hiwdg);
 	}
 }
 
@@ -1461,6 +1497,7 @@ void T_temperature_handler(){
 	char *s;
 	for ( s=temperature_str; *s != '\0'; s++ ) {
 		HAL_UART_Transmit(&huart2,(uint8_t *)s , 1, 100);
+		//HAL_IWDG_Refresh(&hiwdg);
 	}
 }
 

@@ -114,7 +114,8 @@ typedef enum {
 	TEST1_STATE = 0x0D,
 	SHOW_2V5_VOLTAGE_STATE = 0x0E,
 	SHOW_3V3_VOLTAGE_STATE = 0x0F,
-	RESET_CALIBRATION_STATE = 0X10
+	RESET_CALIBRATION_STATE = 0x10,
+	INIT_CALIBRATION_STATE = 0x11
 } calibration_state_t;
 
 typedef enum {
@@ -128,6 +129,7 @@ typedef enum {
 void check_menu_input();
 void check_input_voltage();
 void update_temperatures();
+void init_calibration_handler();
 void calibrate_all_probes_handler();
 void confirm_detected_handler();
 void should_probe_handler();
